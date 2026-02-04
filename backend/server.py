@@ -23,6 +23,10 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
 import asyncio
 
+# Load environment FIRST before any other imports that use os.environ
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
+
 from models import (
     Order, OrderCreate, OrderUpdate, OrderStatus, OrderType, OrderCategory,
     CatalogItem, CatalogItemCreate, CatalogItemUpdate,
@@ -32,9 +36,6 @@ from models import (
     CANCELLATION_REASONS
 )
 from ifood_client import ifood_client
-
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
