@@ -57,8 +57,19 @@ export default function OrderDetail() {
   const [cancelReason, setCancelReason] = useState("501");
 
   useEffect(() => {
-    fetchOrder();
-  }, [orderId]);
+    const loadOrder = async () => {
+      try {
+        const response = await api.get("/orders/" + orderId);
+        setOrder(response.data);
+      } catch (error) {
+        toast.error("Pedido não encontrado");
+        navigate("/orders");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadOrder();
+  }, [orderId, navigate]);
 
   const fetchOrder = async () => {
     try {
