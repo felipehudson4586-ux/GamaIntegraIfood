@@ -89,140 +89,37 @@ async def get_merchant_id() -> str:
     return os.environ.get('IFOOD_MERCHANT_ID', '')
 
 
-# ==================== MODULE 1: AUTHENTICATION ====================
+# ==================== MODULE 1: AUTHENTICATION (Centralizado) ====================
 
-@auth_router.post("/usercode")
-async def generate_user_code():
+@auth_router.get("/token")
+async def get_auth_token():
     """
-    Passo 1: Gera userCode para autorização no Portal iFood
-    O usuário deve acessar a URL retornada e autorizar o app
-    """
-    try:
-        result = await ifood_client.generate_user_code()
-        
-        # Salva no banco para recuperar depois
-        await db.auth_state.update_one(
-            {"type": "user_code"},
-            {"$set": {
-                "user_code": result.get("userCode"),
-                "verification_url": result.get("verificationUrlComplete"),
-                "code_verifier": result.get("authorizationCodeVerifier"),
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "expires_in": result.get("expiresIn", 600)
-            }},
-            upsert=True
-        )
-        
-        return APIResponse(success=True, data=result, message="Acesse a URL e autorize o aplicativo no Portal iFood")
-    except Exception as e:
-        logger.error(f"Erro ao gerar userCode: {str(e)}")
-        return APIResponse(success=False, error=str(e))
-
-
-@auth_router.post("/authorize")
-async def authorize_with_code(authorization_code: str):
-    """
-    Passo 2: Troca authorizationCode por accessToken
-    Use o código que você recebeu após autorizar no Portal iFood
+    Obtém token de autenticação do iFood (app centralizado)
+    Usa client_credentials - não precisa de autorização do usuário
     """
     try:
-        # Recupera code_verifier salvo
-        auth_state = await db.auth_state.find_one({"type": "user_code"})
-        code_verifier = auth_state.get("code_verifier") if auth_state else None
-        
-        result = await ifood_client.authenticate_with_code(authorization_code, code_verifier)
-        
-        # Salva tokens no banco
-        await db.auth_state.update_one(
-            {"type": "tokens"},
-            {"$set": {
-                "access_token": result.get("access_token"),
-                "refresh_token": result.get("refresh_token"),
-                "expires_at": result.get("expires_at"),
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            }},
-            upsert=True
-        )
-        
-        return APIResponse(success=True, data={
-            "message": "Autenticação concluída com sucesso!",
-            "expires_at": result.get("expires_at")
-        })
-    except Exception as e:
-        logger.error(f"Erro ao autorizar: {str(e)}")
-        return APIResponse(success=False, error=str(e))
-
-
-@auth_router.post("/refresh")
-async def refresh_token():
-    """Renova o accessToken usando refreshToken"""
-    try:
-        result = await ifood_client.refresh_access_token()
-        
-        # Atualiza tokens no banco
-        await db.auth_state.update_one(
-            {"type": "tokens"},
-            {"$set": {
-                "access_token": result.get("access_token"),
-                "expires_at": result.get("expires_at"),
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            }}
-        )
-        
+        result = await ifood_client.authenticate()
         return APIResponse(success=True, data=result)
     except Exception as e:
-        logger.error(f"Erro ao renovar token: {str(e)}")
+        logger.error(f"Erro de autenticação: {str(e)}")
         return APIResponse(success=False, error=str(e))
 
 
 @auth_router.get("/status")
 async def get_auth_status():
     """Verifica status da autenticação"""
-    has_credentials = bool(
-        os.environ.get('IFOOD_CLIENT_ID') and 
-        os.environ.get('IFOOD_CLIENT_SECRET')
-    )
-    merchant_id = await get_merchant_id()
-    
-    # Verifica tokens salvos
-    tokens = await db.auth_state.find_one({"type": "tokens"}, {"_id": 0})
-    user_code_state = await db.auth_state.find_one({"type": "user_code"}, {"_id": 0})
-    
     status = ifood_client.get_auth_status()
-    status["has_credentials"] = has_credentials
-    status["merchant_id"] = merchant_id
-    
-    if tokens:
-        status["has_saved_tokens"] = True
-        status["saved_token_expires_at"] = tokens.get("expires_at")
-    
-    if user_code_state:
-        status["pending_authorization"] = {
-            "user_code": user_code_state.get("user_code"),
-            "verification_url": user_code_state.get("verification_url"),
-            "created_at": user_code_state.get("created_at")
-        }
-    
     return status
 
 
-@auth_router.post("/restore")
-async def restore_tokens():
-    """Restaura tokens salvos no banco de dados"""
+@auth_router.get("/merchants")
+async def list_merchants():
+    """Lista merchants vinculados ao app"""
     try:
-        tokens = await db.auth_state.find_one({"type": "tokens"})
-        if not tokens:
-            return APIResponse(success=False, error="Nenhum token salvo encontrado")
-        
-        ifood_client.set_tokens(
-            access_token=tokens.get("access_token"),
-            refresh_token=tokens.get("refresh_token"),
-            expires_in=3600
-        )
-        
-        return APIResponse(success=True, message="Tokens restaurados com sucesso")
+        merchants = await ifood_client.get_merchants()
+        return APIResponse(success=True, data=merchants)
     except Exception as e:
-        logger.error(f"Erro ao restaurar tokens: {str(e)}")
+        logger.error(f"Erro ao listar merchants: {str(e)}")
         return APIResponse(success=False, error=str(e))
 
 
