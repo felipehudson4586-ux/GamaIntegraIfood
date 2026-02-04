@@ -319,7 +319,16 @@ class IFoodDashboardTester:
             print(f"   Merchant Name: {details.get('name', 'N/A')}")
             print(f"   Address: {details.get('address', {}).get('formattedAddress', 'N/A')}")
             operations = details.get('operations', [])
-            print(f"   Operations: {', '.join(operations) if operations else 'None'}")
+            if operations:
+                if isinstance(operations[0], dict):
+                    # Operations are objects, extract names
+                    op_names = [op.get('name', str(op)) for op in operations]
+                    print(f"   Operations: {', '.join(op_names)}")
+                else:
+                    # Operations are strings
+                    print(f"   Operations: {', '.join(operations)}")
+            else:
+                print(f"   Operations: None")
         
         # Test merchant status
         success, status_data = self.run_test("Merchant Status", "GET", f"/api/merchant/status/{merchant_id}")
