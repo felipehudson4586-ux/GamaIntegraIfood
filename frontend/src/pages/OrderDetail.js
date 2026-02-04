@@ -12,8 +12,7 @@ import {
   MapPin,
   Phone,
   CreditCard,
-  Printer,
-  Navigation
+  Printer
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -39,19 +38,6 @@ import {
 import { toast } from "sonner";
 import api from "../lib/api";
 
-const statusConfig = {
-  PLACED: { label: "Novo", color: "badge-new", icon: Clock, nextAction: "Confirmar" },
-  CONFIRMED: { label: "Confirmado", color: "badge-confirmed", icon: CheckCircle, nextAction: "Iniciar Preparo" },
-  PREPARATION_STARTED: { label: "Preparando", color: "badge-preparing", icon: ChefHat, nextAction: "Marcar Pronto" },
-  SEPARATION_STARTED: { label: "Separando", color: "badge-preparing", icon: Package, nextAction: "Finalizar Separação" },
-  SEPARATION_ENDED: { label: "Separado", color: "badge-ready", icon: Package, nextAction: "Despachar" },
-  READY_TO_PICKUP: { label: "Pronto", color: "badge-ready", icon: Package, nextAction: "Despachar" },
-  DISPATCHED: { label: "Despachado", color: "badge-dispatched", icon: Truck, nextAction: null },
-  ARRIVED: { label: "Chegou", color: "badge-dispatched", icon: Truck, nextAction: null },
-  CONCLUDED: { label: "Concluído", color: "badge-concluded", icon: CheckCircle, nextAction: null },
-  CANCELLED: { label: "Cancelado", color: "badge-cancelled", icon: XCircle, nextAction: null },
-};
-
 const cancellationReasons = [
   { code: "501", description: "Problemas de sistema" },
   { code: "502", description: "Pedido duplicado" },
@@ -59,8 +45,6 @@ const cancellationReasons = [
   { code: "504", description: "Restaurante fechado" },
   { code: "505", description: "Sem entregador disponível" },
   { code: "506", description: "Cliente solicitou cancelamento" },
-  { code: "507", description: "Endereço inválido" },
-  { code: "508", description: "Área fora da cobertura" },
 ];
 
 export default function OrderDetail() {
@@ -78,10 +62,9 @@ export default function OrderDetail() {
 
   const fetchOrder = async () => {
     try {
-      const response = await api.get(`/orders/${orderId}`);
+      const response = await api.get("/orders/" + orderId);
       setOrder(response.data);
     } catch (error) {
-      console.error("Erro ao carregar pedido:", error);
       toast.error("Pedido não encontrado");
       navigate("/orders");
     } finally {
@@ -89,36 +72,69 @@ export default function OrderDetail() {
     }
   };
 
-  const handleAction = async (action) => {
+  const handleConfirm = async () => {
     setActionLoading(true);
     try {
-      let endpoint = "";
-      switch (action) {
-        case "confirm":
-          endpoint = `/orders/${orderId}/confirm`;
-          break;
-        case "start-preparation":
-          endpoint = `/orders/${orderId}/start-preparation`;
-          break;
-        case "ready":
-          endpoint = `/orders/${orderId}/ready`;
-          break;
-        case "dispatch":
-          endpoint = `/orders/${orderId}/dispatch`;
-          break;
-        default:
-          return;
-      }
-
-      const response = await api.post(endpoint);
+      const response = await api.post("/orders/" + orderId + "/confirm");
       if (response.data.success) {
-        toast.success(response.data.message);
+        toast.success("Pedido confirmado");
         fetchOrder();
       } else {
-        toast.error(response.data.error || "Erro na operação");
+        toast.error(response.data.error || "Erro");
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Erro ao processar ação");
+      toast.error("Erro ao confirmar");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleStartPreparation = async () => {
+    setActionLoading(true);
+    try {
+      const response = await api.post("/orders/" + orderId + "/start-preparation");
+      if (response.data.success) {
+        toast.success("Preparo iniciado");
+        fetchOrder();
+      } else {
+        toast.error(response.data.error || "Erro");
+      }
+    } catch (error) {
+      toast.error("Erro ao iniciar preparo");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReady = async () => {
+    setActionLoading(true);
+    try {
+      const response = await api.post("/orders/" + orderId + "/ready");
+      if (response.data.success) {
+        toast.success("Pedido pronto");
+        fetchOrder();
+      } else {
+        toast.error(response.data.error || "Erro");
+      }
+    } catch (error) {
+      toast.error("Erro ao marcar pronto");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDispatch = async () => {
+    setActionLoading(true);
+    try {
+      const response = await api.post("/orders/" + orderId + "/dispatch");
+      if (response.data.success) {
+        toast.success("Pedido despachado");
+        fetchOrder();
+      } else {
+        toast.error(response.data.error || "Erro");
+      }
+    } catch (error) {
+      toast.error("Erro ao despachar");
     } finally {
       setActionLoading(false);
     }
@@ -127,37 +143,19 @@ export default function OrderDetail() {
   const handleCancel = async () => {
     setActionLoading(true);
     try {
-      const response = await api.post(`/orders/${orderId}/cancel?cancellation_code=${cancelReason}`);
+      const response = await api.post("/orders/" + orderId + "/cancel?cancellation_code=" + cancelReason);
       if (response.data.success) {
         toast.success("Pedido cancelado");
         setShowCancelDialog(false);
         fetchOrder();
       } else {
-        toast.error(response.data.error || "Erro ao cancelar");
+        toast.error(response.data.error || "Erro");
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Erro ao cancelar pedido");
+      toast.error("Erro ao cancelar");
     } finally {
       setActionLoading(false);
     }
-  };
-
-  const getNextAction = () => {
-    const status = statusConfig[order?.status];
-    if (!status?.nextAction) return null;
-
-    const actionMap = {
-      "Confirmar": "confirm",
-      "Iniciar Preparo": "start-preparation",
-      "Marcar Pronto": "ready",
-      "Finalizar Separação": "ready",
-      "Despachar": "dispatch",
-    };
-
-    return {
-      label: status.nextAction,
-      action: actionMap[status.nextAction]
-    };
   };
 
   const formatDateTime = (dateString) => {
@@ -166,10 +164,36 @@ export default function OrderDetail() {
   };
 
   const formatCurrency = (value) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL"
-    }).format(value || 0);
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
+  };
+
+  const getStatusLabel = (status) => {
+    const labels = {
+      PLACED: "Novo",
+      CONFIRMED: "Confirmado",
+      PREPARATION_STARTED: "Preparando",
+      SEPARATION_STARTED: "Separando",
+      SEPARATION_ENDED: "Separado",
+      READY_TO_PICKUP: "Pronto",
+      DISPATCHED: "Despachado",
+      CONCLUDED: "Concluído",
+      CANCELLED: "Cancelado"
+    };
+    return labels[status] || status;
+  };
+
+  const getStatusBadgeClass = (status) => {
+    const classes = {
+      PLACED: "badge-new",
+      CONFIRMED: "badge-confirmed",
+      PREPARATION_STARTED: "badge-preparing",
+      SEPARATION_STARTED: "badge-preparing",
+      READY_TO_PICKUP: "badge-ready",
+      DISPATCHED: "badge-dispatched",
+      CONCLUDED: "badge-concluded",
+      CANCELLED: "badge-cancelled"
+    };
+    return classes[status] || "";
   };
 
   if (loading) {
@@ -181,35 +205,27 @@ export default function OrderDetail() {
     );
   }
 
-  if (!order) {
-    return null;
-  }
+  if (!order) return null;
 
-  const status = statusConfig[order.status] || statusConfig.PLACED;
-  const StatusIcon = status.icon;
-  const nextAction = getNextAction();
+  const canConfirm = order.status === "PLACED";
+  const canStartPrep = order.status === "CONFIRMED";
+  const canMarkReady = order.status === "PREPARATION_STARTED" || order.status === "SEPARATION_STARTED";
+  const canDispatch = order.status === "READY_TO_PICKUP" || order.status === "SEPARATION_ENDED";
+  const canCancel = order.status !== "CANCELLED" && order.status !== "CONCLUDED";
 
   return (
     <div className="space-y-6" data-testid="order-detail">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={() => navigate("/orders")}
-            data-testid="back-btn"
-          >
+          <Button variant="ghost" size="icon" onClick={() => navigate("/orders")} data-testid="back-btn">
             <ArrowLeft size={20} />
           </Button>
           <div>
             <div className="flex items-center gap-3">
               <h1 className="font-heading text-2xl font-bold">Pedido #{order.display_id}</h1>
-              <Badge className={status.color}>{status.label}</Badge>
+              <Badge className={getStatusBadgeClass(order.status)}>{getStatusLabel(order.status)}</Badge>
             </div>
-            <p className="text-gray-500 text-sm mt-1">
-              Criado em {formatDateTime(order.created_at)}
-            </p>
+            <p className="text-gray-500 text-sm mt-1">Criado em {formatDateTime(order.created_at)}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -217,47 +233,49 @@ export default function OrderDetail() {
             <Printer size={16} />
             Imprimir
           </Button>
-          {order.status !== "CANCELLED" && order.status !== "CONCLUDED" && (
-            <Button
-              variant="destructive"
-              onClick={() => setShowCancelDialog(true)}
-              data-testid="cancel-btn"
-            >
+          {canCancel && (
+            <Button variant="destructive" onClick={() => setShowCancelDialog(true)} data-testid="cancel-btn">
               Cancelar
             </Button>
           )}
         </div>
       </div>
 
-      {/* Action Bar */}
-      {nextAction && (
+      {/* Action Buttons */}
+      {(canConfirm || canStartPrep || canMarkReady || canDispatch) && (
         <Card className="border-2 border-ifood-red/20 bg-red-50/30">
           <CardContent className="py-4">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-ifood-red/10 rounded-full flex items-center justify-center">
-                  <StatusIcon size={20} className="text-ifood-red" />
-                </div>
-                <div>
-                  <p className="font-medium">Próxima ação disponível</p>
-                  <p className="text-sm text-gray-500">Avance o pedido para o próximo estágio</p>
-                </div>
-              </div>
-              <Button
-                className="btn-ifood"
-                onClick={() => handleAction(nextAction.action)}
-                disabled={actionLoading}
-                data-testid="next-action-btn"
-              >
-                {actionLoading ? "Processando..." : nextAction.label}
-              </Button>
+            <div className="flex flex-wrap items-center gap-3">
+              {canConfirm && (
+                <Button className="btn-ifood" onClick={handleConfirm} disabled={actionLoading} data-testid="confirm-btn">
+                  <CheckCircle size={16} className="mr-2" />
+                  Confirmar Pedido
+                </Button>
+              )}
+              {canStartPrep && (
+                <Button className="btn-ifood" onClick={handleStartPreparation} disabled={actionLoading} data-testid="start-prep-btn">
+                  <ChefHat size={16} className="mr-2" />
+                  Iniciar Preparo
+                </Button>
+              )}
+              {canMarkReady && (
+                <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={handleReady} disabled={actionLoading} data-testid="ready-btn">
+                  <Package size={16} className="mr-2" />
+                  Marcar Pronto
+                </Button>
+              )}
+              {canDispatch && (
+                <Button className="bg-purple-600 hover:bg-purple-700 text-white" onClick={handleDispatch} disabled={actionLoading} data-testid="dispatch-btn">
+                  <Truck size={16} className="mr-2" />
+                  Despachar
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
       )}
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Left Column - Order Details */}
         <div className="lg:col-span-2 space-y-6">
           {/* Items */}
           <Card data-testid="order-items">
@@ -266,7 +284,7 @@ export default function OrderDetail() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {order.items?.map((item, idx) => (
+                {order.items && order.items.map((item, idx) => (
                   <div key={idx} className="flex items-start justify-between py-3 border-b border-gray-100 last:border-0">
                     <div className="flex items-start gap-3">
                       <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-sm font-bold text-gray-600">
@@ -274,18 +292,7 @@ export default function OrderDetail() {
                       </div>
                       <div>
                         <p className="font-medium">{item.name}</p>
-                        {item.observations && (
-                          <p className="text-sm text-gray-500 mt-1">{item.observations}</p>
-                        )}
-                        {item.garnish_items && item.garnish_items.length > 0 && (
-                          <div className="mt-2 space-y-1">
-                            {item.garnish_items.map((garnish, gIdx) => (
-                              <p key={gIdx} className="text-xs text-gray-400">
-                                + {garnish.quantity || 1}x {garnish.name}
-                              </p>
-                            ))}
-                          </div>
-                        )}
+                        {item.observations && <p className="text-sm text-gray-500 mt-1">{item.observations}</p>}
                       </div>
                     </div>
                     <p className="font-medium">{formatCurrency(item.total_price)}</p>
@@ -295,7 +302,6 @@ export default function OrderDetail() {
 
               <Separator className="my-4" />
 
-              {/* Totals */}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Subtotal</span>
@@ -329,60 +335,17 @@ export default function OrderDetail() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <TimelineItem
-                  icon={Clock}
-                  label="Pedido criado"
-                  time={formatDateTime(order.created_at)}
-                  active
-                />
-                {order.confirmed_at && (
-                  <TimelineItem
-                    icon={CheckCircle}
-                    label="Confirmado"
-                    time={formatDateTime(order.confirmed_at)}
-                    active
-                  />
-                )}
-                {order.preparation_start_datetime && (
-                  <TimelineItem
-                    icon={ChefHat}
-                    label="Preparo iniciado"
-                    time={formatDateTime(order.preparation_start_datetime)}
-                    active
-                  />
-                )}
-                {order.dispatched_at && (
-                  <TimelineItem
-                    icon={Truck}
-                    label="Despachado"
-                    time={formatDateTime(order.dispatched_at)}
-                    active
-                  />
-                )}
-                {order.concluded_at && (
-                  <TimelineItem
-                    icon={CheckCircle}
-                    label="Concluído"
-                    time={formatDateTime(order.concluded_at)}
-                    active
-                    success
-                  />
-                )}
-                {order.cancelled_at && (
-                  <TimelineItem
-                    icon={XCircle}
-                    label={`Cancelado: ${order.cancellation_reason || ""}`}
-                    time={formatDateTime(order.cancelled_at)}
-                    active
-                    error
-                  />
-                )}
+                <TimelineItem icon={Clock} label="Pedido criado" time={formatDateTime(order.created_at)} active />
+                {order.confirmed_at && <TimelineItem icon={CheckCircle} label="Confirmado" time={formatDateTime(order.confirmed_at)} active />}
+                {order.preparation_start_datetime && <TimelineItem icon={ChefHat} label="Preparo iniciado" time={formatDateTime(order.preparation_start_datetime)} active />}
+                {order.dispatched_at && <TimelineItem icon={Truck} label="Despachado" time={formatDateTime(order.dispatched_at)} active />}
+                {order.concluded_at && <TimelineItem icon={CheckCircle} label="Concluído" time={formatDateTime(order.concluded_at)} active success />}
+                {order.cancelled_at && <TimelineItem icon={XCircle} label={"Cancelado: " + (order.cancellation_reason || "")} time={formatDateTime(order.cancelled_at)} active error />}
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Right Column - Customer & Delivery */}
         <div className="space-y-6">
           {/* Customer */}
           <Card data-testid="customer-info">
@@ -392,75 +355,30 @@ export default function OrderDetail() {
                 Cliente
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="font-medium text-lg">{order.customer?.name || "Cliente"}</p>
-                {order.customer?.phone && (
-                  <p className="text-sm text-gray-500 flex items-center gap-2 mt-1">
-                    <Phone size={14} />
-                    {order.customer.phone}
-                  </p>
-                )}
-              </div>
+            <CardContent>
+              <p className="font-medium text-lg">{order.customer?.name || "Cliente"}</p>
+              {order.customer?.phone && (
+                <p className="text-sm text-gray-500 flex items-center gap-2 mt-1">
+                  <Phone size={14} />
+                  {order.customer.phone}
+                </p>
+              )}
             </CardContent>
           </Card>
 
-          {/* Delivery Address */}
+          {/* Address */}
           {order.address && order.order_type === "DELIVERY" && (
             <Card data-testid="delivery-address">
               <CardHeader>
                 <CardTitle className="text-lg font-heading flex items-center gap-2">
                   <MapPin size={18} />
-                  Endereço de Entrega
+                  Endereço
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <p className="font-medium">
-                  {order.address.street_name}, {order.address.street_number}
-                </p>
-                {order.address.complement && (
-                  <p className="text-sm text-gray-500">{order.address.complement}</p>
-                )}
-                <p className="text-sm text-gray-500">
-                  {order.address.neighborhood}
-                  {order.address.city && `, ${order.address.city}`}
-                  {order.address.state && ` - ${order.address.state}`}
-                </p>
-                {order.address.postal_code && (
-                  <p className="text-sm text-gray-400">CEP: {order.address.postal_code}</p>
-                )}
-                {order.address.reference && (
-                  <p className="text-sm text-gray-500 mt-2 italic">
-                    Ref: {order.address.reference}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Driver */}
-          {order.driver && (
-            <Card data-testid="driver-info">
-              <CardHeader>
-                <CardTitle className="text-lg font-heading flex items-center gap-2">
-                  <Navigation size={18} />
-                  Entregador
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <p className="font-medium">{order.driver.name}</p>
-                {order.driver.phone && (
-                  <p className="text-sm text-gray-500 flex items-center gap-2">
-                    <Phone size={14} />
-                    {order.driver.phone}
-                  </p>
-                )}
-                {order.driver.vehicle_type && (
-                  <p className="text-sm text-gray-500">
-                    {order.driver.vehicle_type}
-                    {order.driver.vehicle_license_plate && ` - ${order.driver.vehicle_license_plate}`}
-                  </p>
-                )}
+                <p className="font-medium">{order.address.street_name}, {order.address.street_number}</p>
+                {order.address.complement && <p className="text-sm text-gray-500">{order.address.complement}</p>}
+                <p className="text-sm text-gray-500">{order.address.neighborhood}</p>
               </CardContent>
             </Card>
           )}
@@ -489,7 +407,7 @@ export default function OrderDetail() {
             </CardContent>
           </Card>
 
-          {/* Order Info */}
+          {/* Info */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg font-heading">Informações</CardTitle>
@@ -503,16 +421,6 @@ export default function OrderDetail() {
                 <span className="text-gray-500">Categoria</span>
                 <span>{order.category}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Momento</span>
-                <span>{order.moment === "IMMEDIATE" ? "Imediato" : "Agendado"}</span>
-              </div>
-              {order.ifood_id && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">iFood ID</span>
-                  <span className="text-xs font-mono">{order.ifood_id.slice(0, 8)}...</span>
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>
@@ -524,7 +432,7 @@ export default function OrderDetail() {
           <AlertDialogHeader>
             <AlertDialogTitle>Cancelar Pedido</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. Selecione o motivo do cancelamento:
+              Selecione o motivo do cancelamento:
             </AlertDialogDescription>
           </AlertDialogHeader>
           <Select value={cancelReason} onValueChange={setCancelReason}>
@@ -533,21 +441,14 @@ export default function OrderDetail() {
             </SelectTrigger>
             <SelectContent>
               {cancellationReasons.map((reason) => (
-                <SelectItem key={reason.code} value={reason.code}>
-                  {reason.description}
-                </SelectItem>
+                <SelectItem key={reason.code} value={reason.code}>{reason.description}</SelectItem>
               ))}
             </SelectContent>
           </Select>
           <AlertDialogFooter>
             <AlertDialogCancel>Voltar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleCancel}
-              className="bg-red-600 hover:bg-red-700"
-              disabled={actionLoading}
-              data-testid="confirm-cancel-btn"
-            >
-              {actionLoading ? "Cancelando..." : "Confirmar Cancelamento"}
+            <AlertDialogAction onClick={handleCancel} className="bg-red-600 hover:bg-red-700" disabled={actionLoading} data-testid="confirm-cancel-btn">
+              {actionLoading ? "Cancelando..." : "Confirmar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -557,25 +458,27 @@ export default function OrderDetail() {
 }
 
 function TimelineItem({ icon: Icon, label, time, active, success, error }) {
+  const getBgClass = () => {
+    if (success) return "bg-green-100";
+    if (error) return "bg-red-100";
+    if (active) return "bg-ifood-red/10";
+    return "bg-gray-100";
+  };
+
+  const getIconClass = () => {
+    if (success) return "text-green-600";
+    if (error) return "text-red-600";
+    if (active) return "text-ifood-red";
+    return "text-gray-400";
+  };
+
   return (
     <div className="flex items-start gap-3">
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-        success ? "bg-green-100" :
-        error ? "bg-red-100" :
-        active ? "bg-ifood-red/10" :
-        "bg-gray-100"
-      }`}>
-        <Icon size={16} className={
-          success ? "text-green-600" :
-          error ? "text-red-600" :
-          active ? "text-ifood-red" :
-          "text-gray-400"
-        } />
+      <div className={"w-8 h-8 rounded-full flex items-center justify-center " + getBgClass()}>
+        <Icon size={16} className={getIconClass()} />
       </div>
       <div>
-        <p className={`font-medium ${error ? "text-red-600" : success ? "text-green-600" : ""}`}>
-          {label}
-        </p>
+        <p className={"font-medium " + (error ? "text-red-600" : success ? "text-green-600" : "")}>{label}</p>
         <p className="text-xs text-gray-500">{time}</p>
       </div>
     </div>
