@@ -1,0 +1,134 @@
+{
+  "design_system": {
+    "identity": {
+      "name": "iFood Partner Dashboard",
+      "tone": "Professional, Efficient, Urgent, Clean",
+      "theme": "light",
+      "primary_color": "#EA1D2C"
+    },
+    "typography": {
+      "font_family": {
+        "headings": "Manrope, sans-serif",
+        "body": "Inter, sans-serif"
+      },
+      "instructions": "Import 'Manrope' and 'Inter' from Google Fonts. Use Manrope for all headings (h1-h6) and Inter for body text. Ensure high readability."
+    },
+    "colors": {
+      "palette": {
+        "primary": {
+          "default": "#EA1D2C",
+          "foreground": "#FFFFFF",
+          "hover": "#C41623"
+        },
+        "background": {
+          "page": "#F2F4F7",
+          "card": "#FFFFFF"
+        },
+        "text": {
+          "primary": "#1A1A1A",
+          "secondary": "#666666",
+          "muted": "#999999"
+        },
+        "status": {
+          "success": "#22C55E",
+          "warning": "#F59E0B",
+          "error": "#EF4444",
+          "info": "#3B82F6"
+        }
+      },
+      "css_variables": {
+        "root": {
+          "--background": "210 20% 96%",
+          "--foreground": "0 0% 10%",
+          "--card": "0 0% 100%",
+          "--card-foreground": "0 0% 10%",
+          "--popover": "0 0% 100%",
+          "--popover-foreground": "0 0% 10%",
+          "--primary": "355 84% 52%",
+          "--primary-foreground": "0 0% 100%",
+          "--secondary": "210 10% 96%",
+          "--secondary-foreground": "0 0% 10%",
+          "--muted": "210 10% 96%",
+          "--muted-foreground": "215 16% 47%",
+          "--accent": "210 10% 96%",
+          "--accent-foreground": "0 0% 10%",
+          "--destructive": "0 84.2% 60.2%",
+          "--destructive-foreground": "0 0% 98%",
+          "--border": "214 32% 91%",
+          "--input": "214 32% 91%",
+          "--ring": "355 84% 52%",
+          "--radius": "0.5rem"
+        }
+      }
+    },
+    "layout": {
+      "spacing": {
+        "container_padding": "p-6 md:p-8",
+        "section_gap": "gap-6",
+        "card_padding": "p-6"
+      },
+      "grid_strategy": "Bento Grid Mode B (High Density)",
+      "structure": {
+        "dashboard": "Sidebar (Left, Fixed) + Main Content (Right, Scrollable)",
+        "card_style": "bg-white shadow-sm border border-gray-100 rounded-lg hover:shadow-md transition-shadow"
+      }
+    },
+    "components": {
+      "buttons": {
+        "primary": "bg-[#EA1D2C] hover:bg-[#C41623] text-white font-semibold rounded-full px-6 py-2 shadow-sm transition-all active:scale-95",
+        "secondary": "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 font-medium rounded-full px-6 py-2",
+        "ghost": "hover:bg-red-50 text-[#EA1D2C] font-medium rounded-lg px-4 py-2"
+      },
+      "cards": {
+        "default": "bg-white rounded-xl border border-gray-100 shadow-sm p-6",
+        "interactive": "bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:border-red-100 hover:shadow-md cursor-pointer transition-all"
+      },
+      "badges": {
+        "status_new": "bg-blue-50 text-blue-700 border-blue-100",
+        "status_preparing": "bg-orange-50 text-orange-700 border-orange-100",
+        "status_ready": "bg-green-50 text-green-700 border-green-100",
+        "status_delivery": "bg-purple-50 text-purple-700 border-purple-100"
+      }
+    },
+    "assets": {
+      "icons": "Use 'lucide-react' for all UI icons. Use 'Utensils', 'ShoppingBag', 'Bike', 'Store', 'BarChart3', 'Settings' for navigation.",
+      "images": {
+        "items": [
+          {
+            "category": "Burgers",
+            "url": "https://images.unsplash.com/photo-1762922425249-144c3bb9167e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MjJ8MHwxfHNlYXJjaHwyfHxkZWxpY2lvdXMlMjBidXJnZXIlMjBwbGF0ZSUyMHJlc3RhdXJhbnR8ZW58MHx8fHwxNzcwMTg4NjU5fDA&ixlib=rb-4.1.0&q=85",
+            "alt": "Juicy gourmet burger"
+          },
+          {
+            "category": "Pizza",
+            "url": "https://images.unsplash.com/photo-1760538635911-dee3b46f2011?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNDR8MHwxfHNlYXJjaHwxfHxnb3VybWV0JTIwcGl6emElMjByZXN0YXVyYW50fGVufDB8fHx8MTc3MDE4ODY2Nnww&ixlib=rb-4.1.0&q=85",
+            "alt": "Rustic gourmet pizza"
+          },
+          {
+            "category": "Sushi",
+            "url": "https://images.unsplash.com/photo-1763647756796-af9230245bf8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHwxfHxmcmVzaCUyMHN1c2hpJTIwcGxhdHRlcnxlbnwwfHx8fDE3NzAxODg2Njh8MA&ixlib=rb-4.1.0&q=85",
+            "alt": "Fresh sushi platter"
+          }
+        ]
+      }
+    }
+  },
+  "instructions_to_main_agent": [
+    "1. UPDATE TAILWIND CONFIG: Add 'Manrope' and 'Inter' to font families. Extend colors with the 'iFood Red' (#EA1D2C).",
+    "2. UPDATE CSS VARIABLES: Replace the contents of 'src/index.css' with the provided CSS variables in the 'colors' section to establish the theme.",
+    "3. LAYOUT IMPLEMENTATION: Create a persistent SidebarLayout component. The sidebar should be white with red active states.",
+    "4. DASHBOARD WIDGETS: Build 'StatCard' components for the dashboard (Orders Today, Revenue, Pending, etc.). Use the 'Bento Grid' layout.",
+    "5. ORDER MANAGEMENT: Create a 'Kanban Board' or 'List View' for orders. Columns: New, Preparing, Ready, Out for Delivery, Delivered.",
+    "6. POLLING SIMULATION: Implement a visual indicator (e.g., a pulsing dot or progress bar) in the header to show the 'Polling' status (every 30s).",
+    "7. NOTIFICATIONS: Use 'sonner' for toast notifications when new orders arrive (simulated).",
+    "8. ACCESSIBILITY: Ensure all buttons and inputs have 'data-testid' attributes. Use semantic HTML.",
+    "9. MOCK DATA: Create a robust mock data generator for Orders and Items since there is no real backend yet."
+  ],
+  "universal_guidelines": [
+    "Avoid generic 'AI slop' designs. Use generous padding (p-6, p-8).",
+    "Do not use gradients for backgrounds. Keep it clean and flat.",
+    "Use 'sonner' for all toast notifications.",
+    "Ensure all interactive elements have hover states.",
+    "Use 'lucide-react' for icons."
+  ]
+}
