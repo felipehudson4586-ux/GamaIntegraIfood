@@ -6,6 +6,7 @@ import {
   Package, 
   Tag, 
   Truck,
+  Store,
   Settings,
   Menu,
   X,
@@ -21,6 +22,7 @@ const navItems = [
   { path: "/items", icon: Package, label: "Catálogo" },
   { path: "/promotions", icon: Tag, label: "Promoções" },
   { path: "/picking", icon: Truck, label: "Separação" },
+  { path: "/merchant", icon: Store, label: "Minha Loja" },
   { path: "/settings", icon: Settings, label: "Configurações" },
 ];
 
