@@ -318,3 +318,5 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: "Correções aplicadas: erro de build resolvido (plugin visual-edits desabilitado), marca d'água removida, notificação sonora implementada usando Web Audio API. Build compila com sucesso."
+  - agent: "testing"
+    message: "✅ MERCHANT MODULE TESTING COMPLETE: All 7 endpoints tested successfully. Health check (✅), Auth status (✅), Merchant list (✅), Details (✅), Status (✅), Interruptions (✅), Opening hours (✅). All responses follow APIResponse format with success=true. iFood integration working correctly with 1 linked merchant. No critical issues found."
