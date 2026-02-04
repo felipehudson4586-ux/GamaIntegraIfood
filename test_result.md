@@ -147,6 +147,9 @@ backend:
       - working: true
         agent: "main"
         comment: "GET /merchant/list funcionando - retornou 1 loja vinculada"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: GET /api/merchant/list - Returns success=true with 1 merchant. All required fields (id, name, corporateName) present. APIResponse format correct."
 
   - task: "Merchant Module - Detalhes da Loja"
     implemented: true
@@ -159,6 +162,9 @@ backend:
       - working: true
         agent: "main"
         comment: "GET /merchant/details/{id} funcionando - retornou nome, endereço e operações"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: GET /api/merchant/details/{merchant_id} - Returns merchant name, address, and operations (delivery). All required fields present."
 
   - task: "Merchant Module - Status da Loja"
     implemented: true
@@ -171,6 +177,9 @@ backend:
       - working: true
         agent: "main"
         comment: "GET /merchant/status/{id} funcionando - retornou status CLOSED com validações"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: GET /api/merchant/status/{merchant_id} - Returns valid state (CLOSED) and validations array. APIResponse format correct."
 
   - task: "Merchant Module - Interrupções"
     implemented: true
@@ -183,6 +192,9 @@ backend:
       - working: true
         agent: "main"
         comment: "CRUD de interrupções implementado - GET/POST/DELETE endpoints funcionando"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: GET /api/merchant/interruptions/{merchant_id} - Returns empty array (no active interruptions). APIResponse format correct."
 
   - task: "Merchant Module - Horários de Funcionamento"
     implemented: true
@@ -195,6 +207,9 @@ backend:
       - working: true
         agent: "main"
         comment: "GET/PUT /merchant/opening-hours funcionando - retornou 1 shift configurado"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: GET /api/merchant/opening-hours/{merchant_id} - Returns 1 shift (MONDAY 09:00:00, 360 min). All required fields (dayOfWeek, start, duration) present."
 
   - task: "Merchant Module - QR Code Check-in"
     implemented: true
