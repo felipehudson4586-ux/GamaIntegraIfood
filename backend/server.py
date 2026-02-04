@@ -1115,9 +1115,256 @@ async def list_events(
 
 # ==================== MERCHANT ====================
 
+# Router do Merchant
+merchant_router = APIRouter(prefix="/merchant", tags=["Merchant"])
+
+
+@merchant_router.get("/list")
+async def list_all_merchants():
+    """
+    Lista todas as lojas vinculadas ao token de acesso.
+    Endpoint iFood: GET /merchant/v1.0/merchants
+    
+    Retorna: ID, nome e nome corporativo das lojas.
+    Use para verificar se o token tem as permissões corretas.
+    """
+    try:
+        merchants = await ifood_client.get_merchants()
+        return APIResponse(
+            success=True, 
+            data=merchants,
+            message=f"{len(merchants)} lojas encontradas"
+        )
+    except Exception as e:
+        logger.error(f"Erro ao listar merchants: {str(e)}")
+        return APIResponse(success=False, error=str(e))
+
+
+@merchant_router.get("/details")
+@merchant_router.get("/details/{merchant_id}")
+async def get_merchant_details(merchant_id: Optional[str] = None):
+    """
+    Obtém detalhes de uma loja específica.
+    Endpoint iFood: GET /merchant/v1.0/merchants/{id}
+    
+    Retorna: Nome, endereço e operações disponíveis (DELIVERY, TAKEOUT, INDOOR).
+    """
+    try:
+        merchant = await ifood_client.get_merchant_details(merchant_id)
+        return APIResponse(success=True, data=merchant)
+    except Exception as e:
+        logger.error(f"Erro ao buscar detalhes: {str(e)}")
+        return APIResponse(success=False, error=str(e))
+
+
+@merchant_router.get("/status")
+@merchant_router.get("/status/{merchant_id}")
+async def get_merchant_status(merchant_id: Optional[str] = None):
+    """
+    Verifica se uma loja pode receber pedidos.
+    Endpoint iFood: GET /merchant/v1.0/merchants/{id}/status
+    
+    Estados possíveis:
+    - OK (Verde): Loja online
+    - WARNING (Amarela): Online com restrições
+    - CLOSED (Cinza): Fechada conforme esperado
+    - ERROR (Vermelha): Fechada inesperadamente
+    
+    Requisitos para receber pedidos:
+    - Estar no horário de funcionamento
+    - Ter catálogo com ao menos um cardápio habilitado
+    - Ter área de entrega configurada
+    - Não ter interrupções ativas
+    - Fazer polling a cada 30 segundos
+    """
+    try:
+        status = await ifood_client.get_merchant_status(merchant_id)
+        return APIResponse(success=True, data=status)
+    except Exception as e:
+        logger.error(f"Erro ao buscar status: {str(e)}")
+        return APIResponse(success=False, error=str(e))
+
+
+@merchant_router.get("/interruptions")
+@merchant_router.get("/interruptions/{merchant_id}")
+async def list_interruptions(merchant_id: Optional[str] = None):
+    """
+    Lista interrupções ativas e futuras de uma loja.
+    Endpoint iFood: GET /merchant/v1.0/merchants/{id}/interruptions
+    
+    Interrupções fecham temporariamente uma loja para parar de receber pedidos.
+    """
+    try:
+        interruptions = await ifood_client.get_interruptions(merchant_id)
+        return APIResponse(
+            success=True, 
+            data=interruptions,
+            message=f"{len(interruptions)} interrupções encontradas"
+        )
+    except Exception as e:
+        logger.error(f"Erro ao listar interrupções: {str(e)}")
+        return APIResponse(success=False, error=str(e))
+
+
+@merchant_router.post("/interruptions")
+@merchant_router.post("/interruptions/{merchant_id}")
+async def create_interruption(
+    start: str = Query(..., description="Data/hora início ISO 8601 (ex: 2024-01-15T10:00:00)"),
+    end: str = Query(..., description="Data/hora fim ISO 8601"),
+    description: str = Query(default="Interrupção via API", description="Descrição da interrupção"),
+    merchant_id: Optional[str] = None
+):
+    """
+    Cria uma interrupção para fechar temporariamente a loja.
+    Endpoint iFood: POST /merchant/v1.0/merchants/{id}/interruptions
+    
+    IMPORTANTE:
+    - Formato de data: ISO 8601 (ex: 2024-01-15T10:00:00)
+    - Interrupções seguem o fuso horário da loja
+    - O fechamento pode levar alguns segundos para efetivar
+    """
+    try:
+        result = await ifood_client.create_interruption(
+            start=start, 
+            end=end, 
+            description=description,
+            merchant_id=merchant_id
+        )
+        return APIResponse(
+            success=True, 
+            data=result,
+            message="Interrupção criada com sucesso"
+        )
+    except Exception as e:
+        logger.error(f"Erro ao criar interrupção: {str(e)}")
+        return APIResponse(success=False, error=str(e))
+
+
+@merchant_router.delete("/interruptions/{interruption_id}")
+async def delete_interruption(
+    interruption_id: str,
+    merchant_id: Optional[str] = Query(default=None)
+):
+    """
+    Remove uma interrupção da loja.
+    Endpoint iFood: DELETE /merchant/v1.0/merchants/{id}/interruptions/{interruptionId}
+    
+    Use quando a loja puder reabrir antes do fim previsto.
+    """
+    try:
+        result = await ifood_client.delete_interruption(
+            interruption_id=interruption_id,
+            merchant_id=merchant_id
+        )
+        return APIResponse(
+            success=True, 
+            data=result,
+            message="Interrupção removida com sucesso"
+        )
+    except Exception as e:
+        logger.error(f"Erro ao remover interrupção: {str(e)}")
+        return APIResponse(success=False, error=str(e))
+
+
+@merchant_router.get("/opening-hours")
+@merchant_router.get("/opening-hours/{merchant_id}")
+async def get_opening_hours(merchant_id: Optional[str] = None):
+    """
+    Consulta horários de funcionamento da loja.
+    Endpoint iFood: GET /merchant/v1.0/merchants/{id}/opening-hours
+    
+    NOTA: Esta API gerencia apenas o horário padrão do iFood Marketplace.
+    """
+    try:
+        hours = await ifood_client.get_opening_hours(merchant_id)
+        return APIResponse(success=True, data=hours)
+    except Exception as e:
+        logger.error(f"Erro ao buscar horários: {str(e)}")
+        return APIResponse(success=False, error=str(e))
+
+
+from pydantic import BaseModel
+
+class ShiftSchedule(BaseModel):
+    """Turno de funcionamento"""
+    dayOfWeek: str  # MONDAY, TUESDAY, etc.
+    start: str  # HH:MM:SS
+    duration: int  # minutos
+
+
+class OpeningHoursUpdate(BaseModel):
+    """Payload para atualizar horários"""
+    shifts: List[ShiftSchedule]
+
+
+@merchant_router.put("/opening-hours")
+@merchant_router.put("/opening-hours/{merchant_id}")
+async def set_opening_hours(
+    payload: OpeningHoursUpdate,
+    merchant_id: Optional[str] = None
+):
+    """
+    Define horários de funcionamento da loja.
+    Endpoint iFood: PUT /merchant/v1.0/merchants/{id}/opening-hours
+    
+    ATENÇÃO: Este endpoint SUBSTITUI todos os horários!
+    - Dias não enviados serão removidos (loja fechada nesses dias)
+    - Múltiplos horários permitidos no mesmo dia (sem sobreposição)
+    - Intervalo válido: 00:00 a 23:59
+    
+    Exemplo de shift:
+        {"dayOfWeek": "MONDAY", "start": "09:00:00", "duration": 360}
+        = Segunda das 09:00 às 15:00 (360 min = 6h)
+    """
+    try:
+        shifts = [s.dict() for s in payload.shifts]
+        result = await ifood_client.set_opening_hours(shifts, merchant_id)
+        return APIResponse(
+            success=True, 
+            data=result,
+            message="Horários atualizados com sucesso"
+        )
+    except Exception as e:
+        logger.error(f"Erro ao atualizar horários: {str(e)}")
+        return APIResponse(success=False, error=str(e))
+
+
+@merchant_router.post("/checkin-qrcode")
+async def generate_checkin_qrcode(
+    merchant_ids: List[str] = Query(default=None, description="IDs dos merchants (máx. 20)")
+):
+    """
+    Gera PDF com QR code para check-in de entregadores.
+    Endpoint iFood: POST /merchant/v1.0/merchants/checkin-qrcode
+    
+    Limites:
+    - Máximo: 20 lojas por requisição
+    - Todas as lojas devem estar vinculadas ao token
+    
+    Retorna: Arquivo PDF em base64 (pronto para impressão)
+    """
+    try:
+        import base64
+        pdf_bytes = await ifood_client.generate_checkin_qrcode(merchant_ids)
+        pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+        return APIResponse(
+            success=True, 
+            data={
+                "pdf_base64": pdf_base64,
+                "content_type": "application/pdf",
+                "merchants_count": len(merchant_ids) if merchant_ids else 1
+            },
+            message="QR code gerado com sucesso"
+        )
+    except Exception as e:
+        logger.error(f"Erro ao gerar QR code: {str(e)}")
+        return APIResponse(success=False, error=str(e))
+
+
+# Endpoint legado para compatibilidade
 @api_router.get("/merchant")
 async def get_merchant_info():
-    """Obtém informações do estabelecimento"""
+    """Obtém informações do estabelecimento (legado)"""
     try:
         merchant = await ifood_client.get_merchant_details()
         return APIResponse(success=True, data=merchant)
@@ -1126,8 +1373,8 @@ async def get_merchant_info():
 
 
 @api_router.get("/merchant/status")
-async def get_merchant_status():
-    """Obtém status do estabelecimento"""
+async def get_merchant_status_legacy():
+    """Obtém status do estabelecimento (legado)"""
     try:
         status = await ifood_client.get_merchant_status()
         return APIResponse(success=True, data=status)
