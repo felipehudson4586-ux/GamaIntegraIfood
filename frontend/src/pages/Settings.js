@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import {
-  Settings as SettingsIcon,
   Key,
   Store,
   RefreshCw,
@@ -10,26 +9,23 @@ import {
   Activity,
   Server,
   Database,
-  ExternalLink,
-  Copy,
-  Play
+  Zap,
+  Users
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
-import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
 import { toast } from "sonner";
 import api from "../lib/api";
 
 export default function Settings() {
   const [authStatus, setAuthStatus] = useState(null);
   const [pollingStatus, setPollingStatus] = useState(null);
+  const [merchants, setMerchants] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [generatingCode, setGeneratingCode] = useState(false);
-  const [authorizing, setAuthorizing] = useState(false);
-  const [authCode, setAuthCode] = useState("");
+  const [testingAuth, setTestingAuth] = useState(false);
+  const [loadingMerchants, setLoadingMerchants] = useState(false);
 
   useEffect(function() {
     fetchAllStatus();
@@ -48,61 +44,37 @@ export default function Settings() {
     }
   };
 
-  var generateUserCode = async function() {
-    setGeneratingCode(true);
+  var testAuthentication = async function() {
+    setTestingAuth(true);
     try {
-      var response = await api.post("/auth/usercode");
+      var response = await api.get("/auth/token");
       if (response.data.success) {
-        toast.success("Código gerado! Acesse a URL para autorizar.");
+        toast.success("Autenticação bem sucedida!");
         fetchAllStatus();
       } else {
-        toast.error(response.data.error || "Erro ao gerar código");
+        toast.error(response.data.error || "Erro na autenticação");
       }
     } catch (error) {
-      toast.error("Erro ao gerar código de autorização");
+      toast.error("Erro ao testar autenticação");
     } finally {
-      setGeneratingCode(false);
+      setTestingAuth(false);
     }
   };
 
-  var authorizeWithCode = async function() {
-    if (!authCode.trim()) {
-      toast.error("Digite o código de autorização");
-      return;
-    }
-    setAuthorizing(true);
+  var loadMerchants = async function() {
+    setLoadingMerchants(true);
     try {
-      var response = await api.post("/auth/authorize?authorization_code=" + authCode.trim());
+      var response = await api.get("/auth/merchants");
       if (response.data.success) {
-        toast.success("Autorização concluída com sucesso!");
-        setAuthCode("");
-        fetchAllStatus();
+        setMerchants(response.data.data || []);
+        toast.success("Merchants carregados: " + (response.data.data || []).length);
       } else {
-        toast.error(response.data.error || "Erro na autorização");
+        toast.error(response.data.error || "Erro ao carregar merchants");
       }
     } catch (error) {
-      toast.error("Erro ao autorizar");
+      toast.error("Erro ao carregar merchants");
     } finally {
-      setAuthorizing(false);
-    }
-  };
-
-  var copyToClipboard = function(text) {
-    navigator.clipboard.writeText(text);
-    toast.success("Copiado!");
-  };
-
-  var restoreTokens = async function() {
-    try {
-      var response = await api.post("/auth/restore");
-      if (response.data.success) {
-        toast.success("Tokens restaurados!");
-        fetchAllStatus();
-      } else {
-        toast.error(response.data.error || "Erro");
-      }
-    } catch (error) {
-      toast.error("Erro ao restaurar tokens");
+      setLoadingMerchants(false);
     }
   };
 
@@ -115,14 +87,13 @@ export default function Settings() {
     );
   }
 
-  var pendingAuth = authStatus && authStatus.pending_authorization;
-  var hasToken = authStatus && authStatus.has_token;
+  var hasToken = authStatus && authStatus.has_token && authStatus.token_valid;
 
   return (
     <div className="space-y-6" data-testid="settings-page">
       <div>
         <h1 className="font-heading text-2xl font-bold text-gray-900">Configurações</h1>
-        <p className="text-gray-500 text-sm mt-1">Gerencie a integração com o iFood</p>
+        <p className="text-gray-500 text-sm mt-1">Gerencie a integração com o iFood (App Centralizado)</p>
       </div>
 
       {/* Connection Status */}
@@ -142,8 +113,8 @@ export default function Settings() {
             />
             <StatusItem
               label="Token iFood"
-              status={hasToken ? "connected" : "warning"}
-              description={hasToken ? "Ativo" : "Não autorizado"}
+              status={hasToken ? "connected" : authStatus && authStatus.has_token ? "warning" : "disconnected"}
+              description={hasToken ? "Válido" : authStatus && authStatus.has_token ? "Expirado" : "Não obtido"}
             />
             <StatusItem
               label="Polling"
@@ -154,129 +125,74 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      {/* OAuth Flow */}
-      <Card className="border-2 border-ifood-red/20">
+      {/* Authentication Card */}
+      <Card className="border-2 border-green-200 bg-green-50/30">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-ifood-red">
-            <Key size={20} />
-            Autorização iFood (OAuth)
+          <CardTitle className="flex items-center gap-2 text-green-700">
+            <Zap size={20} />
+            App Centralizado - client_credentials
           </CardTitle>
           <CardDescription>
-            Siga os passos para autorizar o app a acessar sua loja no iFood
+            Este app usa autenticação direta (client_credentials). Não é necessário autorização do usuário.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Important Notice */}
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-            <p className="font-medium text-amber-800 mb-2">⚠️ Pré-requisitos:</p>
-            <ul className="text-sm text-amber-700 list-disc list-inside space-y-1">
-              <li>O app precisa estar aprovado no Portal do Desenvolvedor iFood</li>
-              <li>As credenciais (Client ID/Secret) devem ter permissão para authorization_code</li>
-              <li>Se você está testando, certifique-se que o app está em modo produção ou sandbox correto</li>
-            </ul>
-          </div>
-
-          {/* Step 1 */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-ifood-red text-white rounded-full flex items-center justify-center font-bold">1</div>
-              <div>
-                <p className="font-medium">Gerar código de autorização</p>
-                <p className="text-sm text-gray-500">Clique para gerar um código (userCode)</p>
-              </div>
-            </div>
+        <CardContent className="space-y-4">
+          <div className="bg-white rounded-lg p-4 border border-green-100">
+            <p className="text-sm text-gray-600 mb-4">
+              Com as credenciais configuradas, o sistema obtém tokens automaticamente quando necessário.
+              Clique abaixo para testar a conexão.
+            </p>
             
-            {pendingAuth && pendingAuth.user_code ? (
-              <div className="ml-11 space-y-3">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-500 mb-2">Seu código:</p>
-                  <div className="flex items-center gap-2">
-                    <code className="text-2xl font-mono font-bold text-ifood-red">{pendingAuth.user_code}</code>
-                    <Button variant="ghost" size="icon" onClick={function() { copyToClipboard(pendingAuth.user_code); }}>
-                      <Copy size={16} />
-                    </Button>
-                  </div>
-                </div>
-                
-                {pendingAuth.verification_url && (
-                  <a 
-                    href={pendingAuth.verification_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-ifood-red hover:underline"
-                  >
-                    <ExternalLink size={16} />
-                    Abrir Portal iFood para autorizar
-                  </a>
-                )}
-              </div>
-            ) : (
-              <div className="ml-11">
-                <Button 
-                  className="btn-ifood gap-2" 
-                  onClick={generateUserCode}
-                  disabled={generatingCode}
-                >
-                  <Play size={16} />
-                  {generatingCode ? "Gerando..." : "Gerar Código"}
-                </Button>
-              </div>
-            )}
-          </div>
-
-          <Separator />
-
-          {/* Step 2 */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-ifood-red text-white rounded-full flex items-center justify-center font-bold">2</div>
-              <div>
-                <p className="font-medium">Autorizar no Portal iFood</p>
-                <p className="text-sm text-gray-500">Acesse o link acima, faça login e clique em "Autorizar". Copie o código recebido.</p>
-              </div>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Step 3 */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-ifood-red text-white rounded-full flex items-center justify-center font-bold">3</div>
-              <div>
-                <p className="font-medium">Inserir código de autorização</p>
-                <p className="text-sm text-gray-500">Cole aqui o código (authorizationCode) que você recebeu</p>
-              </div>
-            </div>
-            
-            <div className="ml-11 flex gap-3">
-              <div className="flex-1 max-w-xs">
-                <Input
-                  placeholder="XXXX-XXXX"
-                  value={authCode}
-                  onChange={function(e) { setAuthCode(e.target.value); }}
-                  className="font-mono"
-                  data-testid="auth-code-input"
-                />
-              </div>
+            <div className="flex flex-wrap gap-3">
               <Button 
-                className="btn-ifood"
-                onClick={authorizeWithCode}
-                disabled={authorizing || !authCode.trim()}
+                className="btn-ifood gap-2"
+                onClick={testAuthentication}
+                disabled={testingAuth}
               >
-                {authorizing ? "Autorizando..." : "Autorizar"}
+                <Key size={16} />
+                {testingAuth ? "Testando..." : "Testar Autenticação"}
+              </Button>
+              
+              <Button 
+                variant="outline"
+                className="gap-2"
+                onClick={loadMerchants}
+                disabled={loadingMerchants}
+              >
+                <Users size={16} />
+                {loadingMerchants ? "Carregando..." : "Listar Merchants"}
               </Button>
             </div>
           </div>
 
           {hasToken && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
+            <div className="bg-green-100 border border-green-200 rounded-lg p-4 flex items-center gap-3">
               <CheckCircle className="text-green-600" size={24} />
               <div>
-                <p className="font-medium text-green-800">Autorização ativa!</p>
+                <p className="font-medium text-green-800">Conexão ativa!</p>
                 <p className="text-sm text-green-600">
-                  {authStatus.token_expires_at && "Expira em: " + new Date(authStatus.token_expires_at).toLocaleString("pt-BR")}
+                  {authStatus.token_expires_at && "Token expira em: " + new Date(authStatus.token_expires_at).toLocaleString("pt-BR")}
                 </p>
+              </div>
+            </div>
+          )}
+
+          {/* Merchants List */}
+          {merchants.length > 0 && (
+            <div className="mt-4">
+              <h4 className="font-medium mb-2">Merchants vinculados:</h4>
+              <div className="space-y-2">
+                {merchants.map(function(m, i) {
+                  return (
+                    <div key={i} className="bg-white rounded-lg p-3 border flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{m.name || m.corporateName || "Merchant"}</p>
+                        <p className="text-xs text-gray-500 font-mono">{m.id}</p>
+                      </div>
+                      <Badge variant="outline">{m.status || "ACTIVE"}</Badge>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -317,12 +233,14 @@ export default function Settings() {
             </div>
           </div>
 
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-            <p className="text-sm text-amber-800">
-              <AlertCircle className="inline mr-2" size={16} />
-              O polling só funciona após a autorização. Complete o fluxo OAuth acima primeiro.
-            </p>
-          </div>
+          {pollingStatus && pollingStatus.errors_count > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-sm text-red-700">
+                <AlertCircle className="inline mr-2" size={16} />
+                {pollingStatus.errors_count} erros. Último: {pollingStatus.last_error}
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -350,14 +268,17 @@ export default function Settings() {
             </div>
           </div>
 
-          {authStatus && authStatus.has_saved_tokens && (
-            <div className="mt-4">
-              <Button variant="outline" onClick={restoreTokens} className="gap-2">
-                <RefreshCw size={16} />
-                Restaurar Tokens Salvos
-              </Button>
-            </div>
-          )}
+          <Separator className="my-4" />
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
+            <p className="font-medium text-blue-800 mb-2">Sobre Apps Centralizados:</p>
+            <ul className="text-blue-700 list-disc list-inside space-y-1">
+              <li>Usa grant_type: client_credentials</li>
+              <li>Token obtido automaticamente com clientId e clientSecret</li>
+              <li>Não recebe refresh_token - renova automaticamente ao expirar</li>
+              <li>Ideal para servidores em ambiente privado/VPC</li>
+            </ul>
+          </div>
         </CardContent>
       </Card>
 
@@ -371,10 +292,10 @@ export default function Settings() {
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <ModuleCard number={1} name="Authentication" description="OAuth token management" status="active" />
+            <ModuleCard number={1} name="Authentication" description="client_credentials (centralizado)" status="active" />
             <ModuleCard number={2} name="Orders" description="Gestão de pedidos e polling" status="active" />
             <ModuleCard number={3} name="Merchant" description="Dados do estabelecimento" status="active" />
-            <ModuleCard number={4} name="Item" description="Catálogo de produtos" status="active" />
+            <ModuleCard number={4} name="Item/Catalog" description="Catálogo de produtos" status="active" />
             <ModuleCard number={5} name="Promotion" description="Gestão de promoções" status="active" />
             <ModuleCard number={6} name="Picking" description="Separação de pedidos" status="active" />
           </div>
