@@ -40,6 +40,13 @@ export default function Dashboard() {
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    const saved = localStorage.getItem('ifood_sound_enabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  
+  const previousOrderCountRef = useRef(null);
+  const { playNewOrderSound } = useNotificationSound();
 
   const fetchData = useCallback(async () => {
     try {
@@ -48,8 +55,24 @@ export default function Dashboard() {
         api.get("/orders/today")
       ]);
       
-      setMetrics(metricsRes.data);
-      setRecentOrders(ordersRes.data.orders?.slice(0, 10) || []);
+      const newMetrics = metricsRes.data;
+      const newOrders = ordersRes.data.orders || [];
+      
+      // Verifica se há novos pedidos pendentes
+      if (previousOrderCountRef.current !== null && 
+          newMetrics?.pending_orders > previousOrderCountRef.current &&
+          soundEnabled) {
+        playNewOrderSound();
+        toast.success("🔔 Novo pedido recebido!", {
+          description: `${newMetrics.pending_orders - previousOrderCountRef.current} novo(s) pedido(s)`,
+          duration: 5000,
+        });
+      }
+      
+      previousOrderCountRef.current = newMetrics?.pending_orders || 0;
+      
+      setMetrics(newMetrics);
+      setRecentOrders(newOrders.slice(0, 10));
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
       toast.error("Erro ao carregar dados do dashboard");
@@ -57,7 +80,7 @@ export default function Dashboard() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [soundEnabled, playNewOrderSound]);
 
   useEffect(() => {
     fetchData();
@@ -68,6 +91,13 @@ export default function Dashboard() {
   const handleRefresh = () => {
     setRefreshing(true);
     fetchData();
+  };
+
+  const toggleSound = () => {
+    const newValue = !soundEnabled;
+    setSoundEnabled(newValue);
+    localStorage.setItem('ifood_sound_enabled', JSON.stringify(newValue));
+    toast.info(newValue ? "Som de notificação ativado" : "Som de notificação desativado");
   };
 
   const formatCurrency = (value) => {
