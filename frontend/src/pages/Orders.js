@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import {
   Clock,
@@ -12,9 +12,11 @@ import {
   RefreshCw,
   Eye,
   MapPin,
-  User
+  User,
+  Volume2,
+  VolumeX
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
@@ -27,6 +29,7 @@ import {
 } from "../components/ui/select";
 import { toast } from "sonner";
 import api from "../lib/api";
+import { useNotificationSound } from "../hooks/useNotificationSound";
 
 const statusConfig = {
   PLACED: { label: "Novo", color: "badge-new", icon: Clock },
