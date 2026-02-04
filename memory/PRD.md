@@ -98,11 +98,16 @@ Desenvolver um Projeto Integrador completo tendo o iFood como sistema central, f
 
 ## Próximos Passos
 
-1. **Validar credenciais iFood** - As credenciais atuais retornam erro 400. Verificar no portal do iFood se estão corretas e se o app foi aprovado para produção.
+1. **Validar permissões do app no Portal iFood** - O erro "Grant type not authorized for client" indica que as credenciais precisam ser aprovadas/configuradas para usar authorization_code no portal: https://developer.ifood.com.br
 
-2. **Testar com pedidos reais** - Após validação das credenciais, testar fluxo completo com pedidos reais.
+2. **Configurar app para produção** - Após aprovação, o fluxo OAuth funcionará automaticamente:
+   - Clique em "Gerar Código" na página de Configurações
+   - Acesse a URL do iFood e autorize
+   - Cole o authorizationCode de volta no sistema
 
-3. **Adicionar impressão** - Implementar template de comanda e integração com impressora.
+3. **Testar com pedidos reais** - Após autorização, o polling começará a receber pedidos
+
+4. **Adicionar impressão** - Implementar template de comanda e integração com impressora
 
 ## Tecnologias Sugeridas para Evolução
 
