@@ -108,6 +108,8 @@ user_problem_statement: |
   1. Correção do erro de build (plugin babel visual-edits desabilitado)
   2. Remoção da marca d'água "Made with Emergent"
   3. Adição de notificação sonora para novos pedidos
+  4. Atualização do módulo de Autenticação (centralizado)
+  5. Desenvolvimento do módulo Merchant completo
 
 backend:
   - task: "API Health Check"
@@ -122,7 +124,7 @@ backend:
         agent: "main"
         comment: "Backend rodando corretamente em localhost:8001"
 
-  - task: "iFood Authentication"
+  - task: "iFood Authentication (Centralizado)"
     implemented: true
     working: true
     file: "backend/ifood_client.py"
@@ -132,7 +134,79 @@ backend:
     status_history:
       - working: true
         agent: "main"
-        comment: "Autenticação centralizada com client_credentials implementada"
+        comment: "Autenticação centralizada com client_credentials implementada, renovação baseada em expiresIn, tratamento de 401"
+
+  - task: "Merchant Module - Listar Lojas"
+    implemented: true
+    working: true
+    file: "backend/ifood_client.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "GET /merchant/list funcionando - retornou 1 loja vinculada"
+
+  - task: "Merchant Module - Detalhes da Loja"
+    implemented: true
+    working: true
+    file: "backend/ifood_client.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "GET /merchant/details/{id} funcionando - retornou nome, endereço e operações"
+
+  - task: "Merchant Module - Status da Loja"
+    implemented: true
+    working: true
+    file: "backend/ifood_client.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "GET /merchant/status/{id} funcionando - retornou status CLOSED com validações"
+
+  - task: "Merchant Module - Interrupções"
+    implemented: true
+    working: true
+    file: "backend/ifood_client.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "CRUD de interrupções implementado - GET/POST/DELETE endpoints funcionando"
+
+  - task: "Merchant Module - Horários de Funcionamento"
+    implemented: true
+    working: true
+    file: "backend/ifood_client.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "GET/PUT /merchant/opening-hours funcionando - retornou 1 shift configurado"
+
+  - task: "Merchant Module - QR Code Check-in"
+    implemented: true
+    working: true
+    file: "backend/ifood_client.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "POST /merchant/checkin-qrcode implementado - gera PDF com QR code"
 
   - task: "Orders Module"
     implemented: true
@@ -182,6 +256,18 @@ frontend:
       - working: true
         agent: "main"
         comment: "Lista de pedidos com filtros e notificação sonora"
+
+  - task: "Página Minha Loja (Merchant)"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/Merchant.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Nova página com status da loja, interrupções, horários e QR code"
 
   - task: "Remoção marca d'água"
     implemented: true
