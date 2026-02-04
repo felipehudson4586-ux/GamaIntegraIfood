@@ -387,6 +387,7 @@ class IFoodDashboardTester:
         # Run all test modules
         self.test_health_endpoints()
         auth_success, token_data = self.test_authentication_module()
+        merchant_id = self.test_merchant_module()  # Add merchant module test
         self.test_orders_module()
         created_item_id = self.test_items_module()
         created_promo_id = self.test_promotions_module()
