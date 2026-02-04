@@ -1418,6 +1418,7 @@ api_router.include_router(promotions_router)
 api_router.include_router(picking_router)
 api_router.include_router(metrics_router)
 api_router.include_router(polling_router)
+api_router.include_router(merchant_router)
 
 app.include_router(api_router)
 
