@@ -166,6 +166,16 @@ export default function Settings() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Important Notice */}
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <p className="font-medium text-amber-800 mb-2">⚠️ Pré-requisitos:</p>
+            <ul className="text-sm text-amber-700 list-disc list-inside space-y-1">
+              <li>O app precisa estar aprovado no Portal do Desenvolvedor iFood</li>
+              <li>As credenciais (Client ID/Secret) devem ter permissão para authorization_code</li>
+              <li>Se você está testando, certifique-se que o app está em modo produção ou sandbox correto</li>
+            </ul>
+          </div>
+
           {/* Step 1 */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
