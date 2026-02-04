@@ -123,6 +123,9 @@ backend:
       - working: true
         agent: "main"
         comment: "Backend rodando corretamente em localhost:8001"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: GET /api/health - Returns status=healthy, database=connected, has_credentials=true, polling_active=false"
 
   - task: "iFood Authentication (Centralizado)"
     implemented: true
@@ -135,6 +138,9 @@ backend:
       - working: true
         agent: "main"
         comment: "Autenticação centralizada com client_credentials implementada, renovação baseada em expiresIn, tratamento de 401"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: GET /api/auth/status - Returns has_credentials=true, app_type=centralized, token_valid=true. Authentication working correctly."
 
   - task: "Merchant Module - Listar Lojas"
     implemented: true
