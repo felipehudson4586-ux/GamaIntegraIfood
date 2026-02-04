@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 class IFoodDashboardTester:
-    def __init__(self, base_url: str = "https://orderhive-1.preview.emergentagent.com"):
+    def __init__(self, base_url: str = "https://menu-sync-platform.preview.emergentagent.com"):
         self.base_url = base_url
         self.tests_run = 0
         self.tests_passed = 0
