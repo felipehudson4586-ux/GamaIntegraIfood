@@ -18,12 +18,21 @@ class IFoodClient:
     BASE_URL = "https://merchant-api.ifood.com.br"
     
     def __init__(self):
-        self.client_id = os.environ.get('IFOOD_CLIENT_ID')
-        self.client_secret = os.environ.get('IFOOD_CLIENT_SECRET')
-        self.merchant_id = os.environ.get('IFOOD_MERCHANT_ID')
         self._access_token: Optional[str] = None
         self._token_expires_at: Optional[datetime] = None
         self._http_client: Optional[httpx.AsyncClient] = None
+    
+    @property
+    def client_id(self):
+        return os.environ.get('IFOOD_CLIENT_ID')
+    
+    @property
+    def client_secret(self):
+        return os.environ.get('IFOOD_CLIENT_SECRET')
+    
+    @property
+    def merchant_id(self):
+        return os.environ.get('IFOOD_MERCHANT_ID')
     
     async def _get_http_client(self) -> httpx.AsyncClient:
         """Retorna cliente HTTP reutilizável"""
