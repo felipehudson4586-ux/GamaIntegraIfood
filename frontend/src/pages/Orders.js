@@ -58,6 +58,13 @@ export default function Orders() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    const saved = localStorage.getItem('ifood_sound_enabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  
+  const previousPendingCountRef = useRef(null);
+  const { playNewOrderSound } = useNotificationSound();
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -71,7 +78,25 @@ export default function Orders() {
       }
       
       const response = await api.get("/orders", { params });
-      setOrders(response.data.orders || []);
+      const newOrders = response.data.orders || [];
+      
+      // Conta pedidos pendentes (PLACED)
+      const pendingCount = newOrders.filter(o => o.status === "PLACED").length;
+      
+      // Verifica se há novos pedidos pendentes
+      if (previousPendingCountRef.current !== null && 
+          pendingCount > previousPendingCountRef.current &&
+          soundEnabled) {
+        playNewOrderSound();
+        toast.success("🔔 Novo pedido!", {
+          description: "Um novo pedido chegou",
+          duration: 5000,
+        });
+      }
+      
+      previousPendingCountRef.current = pendingCount;
+      
+      setOrders(newOrders);
       setTotal(response.data.total || 0);
     } catch (error) {
       console.error("Erro ao carregar pedidos:", error);
@@ -79,7 +104,7 @@ export default function Orders() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, typeFilter]);
+  }, [statusFilter, typeFilter, soundEnabled, playNewOrderSound]);
 
   useEffect(() => {
     fetchOrders();
@@ -98,6 +123,13 @@ export default function Orders() {
       searchParams.set("status", value);
     }
     setSearchParams(searchParams);
+  };
+
+  const toggleSound = () => {
+    const newValue = !soundEnabled;
+    setSoundEnabled(newValue);
+    localStorage.setItem('ifood_sound_enabled', JSON.stringify(newValue));
+    toast.info(newValue ? "Som de notificação ativado" : "Som de notificação desativado");
   };
 
   const filteredOrders = orders.filter(order => {
