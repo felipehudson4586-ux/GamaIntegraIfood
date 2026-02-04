@@ -29,10 +29,13 @@ export default function Picking() {
   const fetchOrders = async () => {
     try {
       const response = await api.get("/orders", { params: { limit: 50 } });
-      const pickingOrders = (response.data.orders || []).filter(order =>
-        order.category === "GROCERY" ||
-        ["CONFIRMED", "SEPARATION_STARTED", "SEPARATION_ENDED"].includes(order.status)
-      );
+      const allOrders = response.data.orders || [];
+      const pickingOrders = allOrders.filter(function(order) {
+        return order.category === "GROCERY" ||
+          order.status === "CONFIRMED" ||
+          order.status === "SEPARATION_STARTED" ||
+          order.status === "SEPARATION_ENDED";
+      });
       setOrders(pickingOrders);
     } catch (error) {
       console.error("Erro ao carregar pedidos:", error);
@@ -42,29 +45,51 @@ export default function Picking() {
     }
   };
 
-  const handleAction = async (order, action) => {
+  const handleStartSeparation = async (orderId) => {
     try {
-      let endpoint = "";
-      if (action === "start") endpoint = `/picking/${order.id}/start`;
-      else if (action === "end") endpoint = `/picking/${order.id}/end`;
-      else if (action === "dispatch") endpoint = `/orders/${order.id}/dispatch`;
-      else return;
-
-      const response = await api.post(endpoint);
+      const response = await api.post(`/picking/${orderId}/start`);
       if (response.data.success) {
-        toast.success(response.data.message);
+        toast.success("Separação iniciada");
         fetchOrders();
       } else {
-        toast.error(response.data.error || "Erro na operação");
+        toast.error(response.data.error || "Erro");
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Erro ao processar ação");
+      toast.error("Erro ao iniciar separação");
     }
   };
 
-  const waitingOrders = orders.filter(o => o.status === "CONFIRMED");
-  const separatingOrders = orders.filter(o => o.status === "SEPARATION_STARTED");
-  const readyOrders = orders.filter(o => o.status === "SEPARATION_ENDED");
+  const handleEndSeparation = async (orderId) => {
+    try {
+      const response = await api.post(`/picking/${orderId}/end`);
+      if (response.data.success) {
+        toast.success("Separação finalizada");
+        fetchOrders();
+      } else {
+        toast.error(response.data.error || "Erro");
+      }
+    } catch (error) {
+      toast.error("Erro ao finalizar separação");
+    }
+  };
+
+  const handleDispatch = async (orderId) => {
+    try {
+      const response = await api.post(`/orders/${orderId}/dispatch`);
+      if (response.data.success) {
+        toast.success("Pedido despachado");
+        fetchOrders();
+      } else {
+        toast.error(response.data.error || "Erro");
+      }
+    } catch (error) {
+      toast.error("Erro ao despachar");
+    }
+  };
+
+  const countByStatus = (status) => {
+    return orders.filter(o => o.status === status).length;
+  };
 
   const formatTime = (dateString) => {
     if (!dateString) return "-";
@@ -82,9 +107,7 @@ export default function Picking() {
     <div className="space-y-6" data-testid="picking-page">
       <div>
         <h1 className="font-heading text-2xl font-bold text-gray-900">Separação</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Gerencie a separação de pedidos (Módulo Picking)
-        </p>
+        <p className="text-gray-500 text-sm mt-1">Gerencie a separação de pedidos (Módulo Picking)</p>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -94,7 +117,7 @@ export default function Picking() {
               <Clock size={20} className="text-amber-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{waitingOrders.length}</p>
+              <p className="text-2xl font-bold">{countByStatus("CONFIRMED")}</p>
               <p className="text-xs text-gray-500">Aguardando</p>
             </div>
           </div>
@@ -105,7 +128,7 @@ export default function Picking() {
               <Package size={20} className="text-blue-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{separatingOrders.length}</p>
+              <p className="text-2xl font-bold">{countByStatus("SEPARATION_STARTED")}</p>
               <p className="text-xs text-gray-500">Em Separação</p>
             </div>
           </div>
@@ -116,7 +139,7 @@ export default function Picking() {
               <CheckCircle size={20} className="text-green-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{readyOrders.length}</p>
+              <p className="text-2xl font-bold">{countByStatus("SEPARATION_ENDED")}</p>
               <p className="text-xs text-gray-500">Prontos</p>
             </div>
           </div>
@@ -133,7 +156,7 @@ export default function Picking() {
               <p className="font-medium text-blue-800">Módulo de Separação (Picking)</p>
               <p className="text-sm text-blue-700">
                 Este módulo é exclusivo para pedidos de mercado (GROCERY). Permite gerenciar 
-                a separação de itens, adicionar/modificar/substituir/remover itens durante o processo.
+                a separação de itens durante o processo.
               </p>
             </div>
           </div>
@@ -143,191 +166,99 @@ export default function Picking() {
       {loading ? (
         <div className="space-y-4">
           <div className="h-32 bg-gray-200 rounded-xl animate-shimmer" />
-          <div className="h-32 bg-gray-200 rounded-xl animate-shimmer" />
         </div>
       ) : orders.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <Package className="mx-auto mb-4 text-gray-300" size={48} />
             <p className="text-gray-500">Nenhum pedido para separação</p>
-            <p className="text-sm text-gray-400 mt-1">
-              Pedidos de mercado aparecerão aqui para separação
-            </p>
+            <p className="text-sm text-gray-400 mt-1">Pedidos de mercado aparecerão aqui</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-6">
-          {waitingOrders.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <Clock size={20} className="text-amber-600" />
-                <h2 className="font-heading font-semibold text-lg">Aguardando Separação</h2>
-                <Badge variant="secondary">{waitingOrders.length}</Badge>
-              </div>
-              <div className="space-y-3">
-                {waitingOrders.map((order) => (
-                  <PickingOrderCard 
-                    key={order.id} 
-                    order={order} 
-                    onAction={() => handleAction(order, "start")}
-                    actionLabel="Iniciar Separação"
-                    ActionIcon={Play}
-                    formatTime={formatTime}
-                    formatCurrency={formatCurrency}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+        <div className="space-y-4">
+          {orders.map((order) => (
+            <Card key={order.id} className="card-ifood" data-testid={`picking-card-${order.id}`}>
+              <CardContent className="p-4">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gray-100">
+                      <Package size={24} className="text-gray-600" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-lg">#{order.display_id}</span>
+                        <Badge variant="outline">{order.category}</Badge>
+                        <Badge variant="secondary">{order.status}</Badge>
+                      </div>
+                      <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <User size={14} />
+                          {order.customer?.name || "Cliente"}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock size={14} />
+                          {formatTime(order.created_at)}
+                        </span>
+                      </div>
+                      {order.address?.street_name && (
+                        <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                          <MapPin size={12} />
+                          {order.address.street_name}
+                        </p>
+                      )}
+                    </div>
+                  </div>
 
-          {separatingOrders.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <Package size={20} className="text-blue-600" />
-                <h2 className="font-heading font-semibold text-lg">Em Separação</h2>
-                <Badge variant="secondary">{separatingOrders.length}</Badge>
-              </div>
-              <div className="space-y-3">
-                {separatingOrders.map((order) => (
-                  <PickingOrderCard 
-                    key={order.id} 
-                    order={order} 
-                    onAction={() => handleAction(order, "end")}
-                    actionLabel="Finalizar Separação"
-                    ActionIcon={Square}
-                    inProgress
-                    formatTime={formatTime}
-                    formatCurrency={formatCurrency}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {readyOrders.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <CheckCircle size={20} className="text-green-600" />
-                <h2 className="font-heading font-semibold text-lg">Prontos para Despacho</h2>
-                <Badge variant="secondary">{readyOrders.length}</Badge>
-              </div>
-              <div className="space-y-3">
-                {readyOrders.map((order) => (
-                  <PickingOrderCard 
-                    key={order.id} 
-                    order={order} 
-                    onAction={() => handleAction(order, "dispatch")}
-                    actionLabel="Despachar"
-                    ActionIcon={Truck}
-                    ready
-                    formatTime={formatTime}
-                    formatCurrency={formatCurrency}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                    <div className="text-left sm:text-right">
+                      <p className="font-bold">{formatCurrency(order.total)}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Link to={`/orders/${order.id}`}>
+                        <Button variant="outline" size="sm">Detalhes</Button>
+                      </Link>
+                      {order.status === "CONFIRMED" && (
+                        <Button 
+                          size="sm" 
+                          className="btn-ifood" 
+                          onClick={() => handleStartSeparation(order.id)}
+                          data-testid={`start-${order.id}`}
+                        >
+                          <Play size={16} className="mr-1" />
+                          Iniciar
+                        </Button>
+                      )}
+                      {order.status === "SEPARATION_STARTED" && (
+                        <Button 
+                          size="sm" 
+                          className="bg-blue-600 hover:bg-blue-700" 
+                          onClick={() => handleEndSeparation(order.id)}
+                          data-testid={`end-${order.id}`}
+                        >
+                          <Square size={16} className="mr-1" />
+                          Finalizar
+                        </Button>
+                      )}
+                      {order.status === "SEPARATION_ENDED" && (
+                        <Button 
+                          size="sm" 
+                          className="bg-green-600 hover:bg-green-700" 
+                          onClick={() => handleDispatch(order.id)}
+                          data-testid={`dispatch-${order.id}`}
+                        >
+                          <Truck size={16} className="mr-1" />
+                          Despachar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
     </div>
-  );
-}
-
-function PickingOrderCard({ order, onAction, actionLabel, ActionIcon, inProgress, ready, formatTime, formatCurrency }) {
-  const getBgClass = () => {
-    if (inProgress) return "border-blue-200";
-    if (ready) return "border-green-200";
-    return "";
-  };
-
-  const getIconBgClass = () => {
-    if (inProgress) return "bg-blue-100";
-    if (ready) return "bg-green-100";
-    return "bg-amber-100";
-  };
-
-  const getIconClass = () => {
-    if (inProgress) return "text-blue-600";
-    if (ready) return "text-green-600";
-    return "text-amber-600";
-  };
-
-  const getBtnClass = () => {
-    if (inProgress) return "bg-blue-600 hover:bg-blue-700";
-    if (ready) return "bg-green-600 hover:bg-green-700";
-    return "btn-ifood";
-  };
-
-  const itemsList = order.items || [];
-  const displayItems = itemsList.slice(0, 5);
-  const remainingCount = itemsList.length - 5;
-
-  return (
-    <Card className={`card-ifood ${getBgClass()}`} data-testid={`picking-card-${order.id}`}>
-      <CardContent className="p-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${getIconBgClass()}`}>
-              <Package size={24} className={getIconClass()} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-lg">#{order.display_id}</span>
-                <Badge variant="outline">{order.category}</Badge>
-              </div>
-              <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
-                <span className="flex items-center gap-1">
-                  <User size={14} />
-                  {order.customer?.name || "Cliente"}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Clock size={14} />
-                  {formatTime(order.created_at)}
-                </span>
-              </div>
-              {order.address?.street_name && (
-                <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                  <MapPin size={12} />
-                  {order.address.street_name}, {order.address.street_number}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <div className="text-left sm:text-right">
-              <p className="text-sm text-gray-500">{itemsList.length} itens</p>
-              <p className="font-bold">{formatCurrency(order.total)}</p>
-            </div>
-            <div className="flex gap-2">
-              <Link to={`/orders/${order.id}`}>
-                <Button variant="outline" size="sm">Detalhes</Button>
-              </Link>
-              <Button size="sm" className={getBtnClass()} onClick={onAction} data-testid={`action-${order.id}`}>
-                <ActionIcon size={16} className="mr-1" />
-                {actionLabel}
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {displayItems.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <div className="flex flex-wrap gap-2">
-              {displayItems.map((item, idx) => (
-                <span key={idx} className="text-xs bg-gray-100 px-2 py-1 rounded-full text-gray-600">
-                  {item.quantity}x {item.name}
-                </span>
-              ))}
-              {remainingCount > 0 && (
-                <span className="text-xs bg-gray-100 px-2 py-1 rounded-full text-gray-500">
-                  +{remainingCount} mais
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
   );
 }
