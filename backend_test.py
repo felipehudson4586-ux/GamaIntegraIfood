@@ -292,6 +292,67 @@ class IFoodDashboardTester:
         # Test stop polling
         self.run_test("Stop Polling", "POST", "/api/polling/stop")
 
+    def test_merchant_module(self):
+        """Test Merchant Module - Complete iFood Partner Dashboard Integration"""
+        print("\n" + "="*60)
+        print("🏪 TESTING MERCHANT MODULE - iFood INTEGRATION")
+        print("="*60)
+        
+        # Test merchant list
+        success, merchants_data = self.run_test("List All Merchants", "GET", "/api/merchant/list")
+        if success:
+            merchants = merchants_data.get('data', [])
+            print(f"   Found {len(merchants)} linked merchants")
+            if merchants:
+                for merchant in merchants:
+                    print(f"   - ID: {merchant.get('id', 'N/A')}")
+                    print(f"     Name: {merchant.get('name', 'N/A')}")
+                    print(f"     Corporate Name: {merchant.get('corporateName', 'N/A')}")
+        
+        # Use the merchant ID from environment or first merchant found
+        merchant_id = "fb3625ab-1907-4e8a-af83-2e0c52733e89"  # From review request
+        
+        # Test merchant details
+        success, details_data = self.run_test("Merchant Details", "GET", f"/api/merchant/details/{merchant_id}")
+        if success:
+            details = details_data.get('data', {})
+            print(f"   Merchant Name: {details.get('name', 'N/A')}")
+            print(f"   Address: {details.get('address', {}).get('formattedAddress', 'N/A')}")
+            operations = details.get('operations', [])
+            print(f"   Operations: {', '.join(operations) if operations else 'None'}")
+        
+        # Test merchant status
+        success, status_data = self.run_test("Merchant Status", "GET", f"/api/merchant/status/{merchant_id}")
+        if success:
+            status = status_data.get('data', {})
+            state = status.get('state', 'UNKNOWN')
+            print(f"   Store State: {state}")
+            validations = status.get('validations', [])
+            print(f"   Validations: {len(validations)} checks")
+            for validation in validations[:3]:  # Show first 3
+                print(f"     - {validation.get('name', 'N/A')}: {validation.get('status', 'N/A')}")
+        
+        # Test interruptions
+        success, interruptions_data = self.run_test("Merchant Interruptions", "GET", f"/api/merchant/interruptions/{merchant_id}")
+        if success:
+            interruptions = interruptions_data.get('data', [])
+            print(f"   Active Interruptions: {len(interruptions)}")
+            for interruption in interruptions:
+                print(f"     - Start: {interruption.get('start', 'N/A')}")
+                print(f"       End: {interruption.get('end', 'N/A')}")
+                print(f"       Description: {interruption.get('description', 'N/A')}")
+        
+        # Test opening hours
+        success, hours_data = self.run_test("Merchant Opening Hours", "GET", f"/api/merchant/opening-hours/{merchant_id}")
+        if success:
+            hours = hours_data.get('data', {})
+            shifts = hours.get('shifts', [])
+            print(f"   Configured Shifts: {len(shifts)}")
+            for shift in shifts:
+                print(f"     - {shift.get('dayOfWeek', 'N/A')}: {shift.get('start', 'N/A')} ({shift.get('duration', 0)} min)")
+        
+        return merchant_id
+
     def test_additional_endpoints(self):
         """Test additional endpoints"""
         print("\n" + "="*60)
@@ -301,9 +362,9 @@ class IFoodDashboardTester:
         # Test events
         self.run_test("List Events", "GET", "/api/events")
         
-        # Test merchant info
-        self.run_test("Merchant Info", "GET", "/api/merchant")
-        self.run_test("Merchant Status", "GET", "/api/merchant/status")
+        # Test legacy merchant endpoints
+        self.run_test("Legacy Merchant Info", "GET", "/api/merchant")
+        self.run_test("Legacy Merchant Status", "GET", "/api/merchant/status")
 
     def cleanup_test_data(self, item_id: Optional[str], promo_id: Optional[str]):
         """Clean up test data"""
