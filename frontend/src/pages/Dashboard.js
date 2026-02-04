@@ -128,16 +128,28 @@ export default function Dashboard() {
           <h1 className="font-heading text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-500 text-sm mt-1">Visão geral dos pedidos de hoje</p>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="gap-2"
-          data-testid="refresh-btn"
-        >
-          <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
-          Atualizar
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant={soundEnabled ? "default" : "outline"}
+            onClick={toggleSound}
+            className={`gap-2 ${soundEnabled ? "bg-ifood-red hover:bg-ifood-red-dark" : ""}`}
+            data-testid="toggle-sound-btn"
+            title={soundEnabled ? "Desativar som" : "Ativar som"}
+          >
+            {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            {soundEnabled ? "Som ON" : "Som OFF"}
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="gap-2"
+            data-testid="refresh-btn"
+          >
+            <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       {/* Stats Grid */}
