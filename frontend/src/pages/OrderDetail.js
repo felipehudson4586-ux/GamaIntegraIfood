@@ -77,7 +77,6 @@ export default function OrderDetail() {
       setOrder(response.data);
     } catch (error) {
       toast.error("Pedido não encontrado");
-      navigate("/orders");
     } finally {
       setLoading(false);
     }
