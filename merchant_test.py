@@ -219,8 +219,19 @@ class MerchantModuleTester:
         success, data = self.run_test("Merchant Status", "GET", f"/api/merchant/status/{self.merchant_id}")
         if success:
             if data.get('success') == True:
-                status = data.get('data', {})
+                status_data = data.get('data', {})
                 print(f"   ✅ Success: {data.get('success')}")
+                
+                # Handle if data is a list (multiple statuses) or dict (single status)
+                if isinstance(status_data, list):
+                    if status_data:
+                        status = status_data[0]  # Take first status
+                        print(f"   Multiple statuses returned, using first one")
+                    else:
+                        print(f"   ❌ Empty status list returned")
+                        return False
+                else:
+                    status = status_data
                 
                 # Check state
                 state = status.get('state', 'MISSING')
