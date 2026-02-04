@@ -158,15 +158,26 @@ export default function Orders() {
           <h1 className="font-heading text-2xl font-bold text-gray-900">Pedidos</h1>
           <p className="text-gray-500 text-sm mt-1">{total} pedidos encontrados</p>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={fetchOrders}
-          className="gap-2"
-          data-testid="refresh-orders-btn"
-        >
-          <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-          Atualizar
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant={soundEnabled ? "default" : "outline"}
+            onClick={toggleSound}
+            className={`gap-2 ${soundEnabled ? "bg-ifood-red hover:bg-ifood-red-dark" : ""}`}
+            data-testid="toggle-sound-btn"
+            title={soundEnabled ? "Desativar som" : "Ativar som"}
+          >
+            {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={fetchOrders}
+            className="gap-2"
+            data-testid="refresh-orders-btn"
+          >
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
