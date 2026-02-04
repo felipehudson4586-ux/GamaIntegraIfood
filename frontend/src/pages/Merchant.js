@@ -102,6 +102,7 @@ export default function Merchant() {
       loadInterruptions();
       loadOpeningHours();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMerchant]);
 
   const loadMerchants = async () => {
