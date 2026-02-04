@@ -1,12 +1,12 @@
 """
 iFood API Client - Integração completa com os 6 módulos do iFood
-Baseado na documentação oficial do iFood Partner API
+App CENTRALIZADO - usa client_credentials diretamente
 
-Fluxo de Autenticação OAuth:
-1. Gerar userCode via /authentication/v1.0/oauth/userCode
-2. Usuário autoriza no Portal iFood e recebe authorizationCode
-3. Usar authorizationCode para obter accessToken
-4. Usar refreshToken para renovar tokens
+Autenticação para apps centralizados:
+- Endpoint: POST /authentication/v1.0/oauth/token
+- Content-Type: application/x-www-form-urlencoded
+- Parâmetros em camelCase: grantType, clientId, clientSecret
+- Não recebe refresh_token (apenas access_token)
 """
 
 import httpx
@@ -14,15 +14,12 @@ import os
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, List, Any
-import asyncio
-import hashlib
-import secrets
-import base64
 
 logger = logging.getLogger(__name__)
 
+
 class IFoodClient:
-    """Cliente para integração com a API do iFood"""
+    """Cliente para integração com a API do iFood - App Centralizado"""
     
     BASE_URL = "https://merchant-api.ifood.com.br"
     
@@ -31,14 +28,8 @@ class IFoodClient:
         self.client_secret = os.environ.get('IFOOD_CLIENT_SECRET')
         self.merchant_id = os.environ.get('IFOOD_MERCHANT_ID')
         self._access_token: Optional[str] = None
-        self._refresh_token: Optional[str] = None
         self._token_expires_at: Optional[datetime] = None
         self._http_client: Optional[httpx.AsyncClient] = None
-        
-        # Para o fluxo de authorization_code
-        self._code_verifier: Optional[str] = None
-        self._user_code: Optional[str] = None
-        self._verification_url: Optional[str] = None
     
     async def _get_http_client(self) -> httpx.AsyncClient:
         """Retorna cliente HTTP reutilizável"""
@@ -51,203 +42,89 @@ class IFoodClient:
         if self._http_client and not self._http_client.is_closed:
             await self._http_client.aclose()
     
-    def _generate_code_verifier(self) -> str:
-        """Gera code_verifier para PKCE"""
-        return secrets.token_urlsafe(64)
+    # ==================== MÓDULO 1: AUTHENTICATION (Centralizado) ====================
     
-    def _generate_code_challenge(self, verifier: str) -> str:
-        """Gera code_challenge a partir do verifier (S256)"""
-        digest = hashlib.sha256(verifier.encode()).digest()
-        return base64.urlsafe_b64encode(digest).rstrip(b'=').decode()
-    
-    # ==================== MÓDULO 1: AUTHENTICATION ====================
-    
-    async def generate_user_code(self) -> Dict[str, Any]:
+    async def authenticate(self) -> Dict[str, Any]:
         """
-        Passo 1: Gera userCode para autorização do usuário
-        Endpoint: POST /authentication/v1.0/oauth/userCode
-        
-        Retorna:
-        - userCode: código para o usuário inserir no Portal iFood
-        - verificationUrl: URL para autorização
-        - verificationUrlComplete: URL completa com código
-        - authorizationCodeVerifier: código para usar na autenticação
-        """
-        if not self.client_id:
-            raise ValueError("IFOOD_CLIENT_ID é obrigatório")
-        
-        client = await self._get_http_client()
-        
-        try:
-            response = await client.post(
-                f"{self.BASE_URL}/authentication/v1.0/oauth/userCode",
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-                data={"clientId": self.client_id}
-            )
-            response.raise_for_status()
-            data = response.json()
-            
-            # Salva para uso posterior
-            self._user_code = data.get("userCode")
-            self._verification_url = data.get("verificationUrlComplete")
-            self._code_verifier = data.get("authorizationCodeVerifier")
-            
-            logger.info(f"UserCode gerado: {self._user_code}")
-            return {
-                "userCode": data.get("userCode"),
-                "verificationUrl": data.get("verificationUrl"),
-                "verificationUrlComplete": data.get("verificationUrlComplete"),
-                "authorizationCodeVerifier": data.get("authorizationCodeVerifier"),
-                "expiresIn": data.get("expiresIn", 600)
-            }
-        except httpx.HTTPStatusError as e:
-            logger.error(f"Erro ao gerar userCode: {e.response.status_code} - {e.response.text}")
-            raise
-    
-    async def authenticate_with_code(self, authorization_code: str, code_verifier: str = None) -> Dict[str, Any]:
-        """
-        Passo 2: Troca authorizationCode por accessToken
+        Obtém token de autenticação do iFood para app CENTRALIZADO
         Endpoint: POST /authentication/v1.0/oauth/token
+        Content-Type: application/x-www-form-urlencoded
         
-        Args:
-            authorization_code: código recebido pelo usuário após autorizar
-            code_verifier: authorizationCodeVerifier retornado no passo 1
+        Parâmetros (camelCase!):
+        - grantType: client_credentials
+        - clientId: ID do app
+        - clientSecret: Secret do app
         """
         if not self.client_id or not self.client_secret:
             raise ValueError("IFOOD_CLIENT_ID e IFOOD_CLIENT_SECRET são obrigatórios")
         
-        verifier = code_verifier or self._code_verifier
-        if not verifier:
-            raise ValueError("authorizationCodeVerifier é obrigatório")
+        # Verifica se token atual ainda é válido (margem de 5 minutos)
+        if self._access_token and self._token_expires_at:
+            if datetime.now(timezone.utc) < self._token_expires_at - timedelta(minutes=5):
+                return {
+                    "accessToken": self._access_token,
+                    "expiresAt": self._token_expires_at.isoformat(),
+                    "cached": True
+                }
         
         client = await self._get_http_client()
         
-        # iFood aceita JSON no body para token
+        # IMPORTANTE: Usar camelCase nos parâmetros!
         payload = {
-            "grantType": "authorization_code",
+            "grantType": "client_credentials",
             "clientId": self.client_id,
-            "clientSecret": self.client_secret,
-            "authorizationCode": authorization_code,
-            "authorizationCodeVerifier": verifier
+            "clientSecret": self.client_secret
         }
         
         try:
             response = await client.post(
                 f"{self.BASE_URL}/authentication/v1.0/oauth/token",
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-                data=payload
+                data=payload,
+                headers={"Content-Type": "application/x-www-form-urlencoded"}
             )
             response.raise_for_status()
             data = response.json()
             
             self._access_token = data.get("accessToken")
-            self._refresh_token = data.get("refreshToken")
             expires_in = data.get("expiresIn", 3600)
             self._token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
             
-            logger.info("Token iFood obtido com sucesso via authorization_code")
+            logger.info("Token iFood obtido com sucesso (app centralizado)")
             return {
-                "access_token": self._access_token,
-                "refresh_token": self._refresh_token,
-                "expires_at": self._token_expires_at.isoformat(),
-                "expires_in": expires_in,
-                "token_type": data.get("type", "Bearer")
+                "accessToken": self._access_token,
+                "expiresIn": expires_in,
+                "expiresAt": self._token_expires_at.isoformat(),
+                "type": data.get("type", "Bearer"),
+                "cached": False
             }
         except httpx.HTTPStatusError as e:
             logger.error(f"Erro de autenticação iFood: {e.response.status_code} - {e.response.text}")
+            raise Exception(f"Erro de autenticação: {e.response.text}")
+        except Exception as e:
+            logger.error(f"Erro ao autenticar com iFood: {str(e)}")
             raise
-    
-    async def refresh_access_token(self) -> Dict[str, Any]:
-        """
-        Renova accessToken usando refreshToken
-        Endpoint: POST /authentication/v1.0/oauth/token
-        """
-        if not self._refresh_token:
-            raise ValueError("refreshToken não disponível. Faça autenticação primeiro.")
-        
-        client = await self._get_http_client()
-        
-        payload = {
-            "grantType": "refresh_token",
-            "clientId": self.client_id,
-            "clientSecret": self.client_secret,
-            "refreshToken": self._refresh_token
-        }
-        
-        try:
-            response = await client.post(
-                f"{self.BASE_URL}/authentication/v1.0/oauth/token",
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-                data=payload
-            )
-            response.raise_for_status()
-            data = response.json()
-            
-            self._access_token = data.get("accessToken")
-            # Refresh token pode ser renovado também
-            if data.get("refreshToken"):
-                self._refresh_token = data.get("refreshToken")
-            expires_in = data.get("expiresIn", 3600)
-            self._token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
-            
-            logger.info("Token renovado com sucesso")
-            return {
-                "access_token": self._access_token,
-                "expires_at": self._token_expires_at.isoformat(),
-                "expires_in": expires_in
-            }
-        except httpx.HTTPStatusError as e:
-            logger.error(f"Erro ao renovar token: {e.response.status_code} - {e.response.text}")
-            raise
-    
-    async def ensure_token(self) -> str:
-        """
-        Garante que há um token válido disponível
-        Renova automaticamente se necessário
-        """
-        if self._access_token and self._token_expires_at:
-            # Renova 5 minutos antes de expirar
-            if datetime.now(timezone.utc) < self._token_expires_at - timedelta(minutes=5):
-                return self._access_token
-            
-            # Tenta renovar com refresh_token
-            if self._refresh_token:
-                try:
-                    await self.refresh_access_token()
-                    return self._access_token
-                except Exception as e:
-                    logger.warning(f"Falha ao renovar token: {e}")
-        
-        # Sem token válido - precisa de nova autenticação
-        raise ValueError("Token não disponível. Execute o fluxo de autorização primeiro.")
-    
-    def set_tokens(self, access_token: str, refresh_token: str = None, expires_in: int = 3600):
-        """
-        Define tokens manualmente (útil para restaurar de banco de dados)
-        """
-        self._access_token = access_token
-        self._refresh_token = refresh_token
-        self._token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
-    
-    def get_auth_status(self) -> Dict[str, Any]:
-        """Retorna status atual da autenticação"""
-        return {
-            "has_credentials": bool(self.client_id and self.client_secret),
-            "has_token": bool(self._access_token),
-            "has_refresh_token": bool(self._refresh_token),
-            "token_valid": self._token_expires_at and datetime.now(timezone.utc) < self._token_expires_at if self._token_expires_at else False,
-            "token_expires_at": self._token_expires_at.isoformat() if self._token_expires_at else None,
-            "merchant_id": self.merchant_id,
-            "pending_user_code": self._user_code,
-            "verification_url": self._verification_url
-        }
     
     async def _get_headers(self) -> Dict[str, str]:
         """Retorna headers com token de autenticação"""
-        token = await self.ensure_token()
+        await self.authenticate()
         return {
-            "Authorization": f"Bearer {token}",
+            "Authorization": f"Bearer {self._access_token}",
             "Content-Type": "application/json"
+        }
+    
+    def get_auth_status(self) -> Dict[str, Any]:
+        """Retorna status atual da autenticação"""
+        token_valid = False
+        if self._access_token and self._token_expires_at:
+            token_valid = datetime.now(timezone.utc) < self._token_expires_at
+        
+        return {
+            "has_credentials": bool(self.client_id and self.client_secret),
+            "has_token": bool(self._access_token),
+            "token_valid": token_valid,
+            "token_expires_at": self._token_expires_at.isoformat() if self._token_expires_at else None,
+            "merchant_id": self.merchant_id,
+            "app_type": "centralized"
         }
     
     # ==================== MÓDULO 2: ORDERS ====================
@@ -285,7 +162,7 @@ class IFoodClient:
             logger.info(f"Polling retornou {len(events)} eventos")
             return {"events": events, "count": len(events)}
         except httpx.HTTPStatusError as e:
-            logger.error(f"Erro no polling: {e.response.status_code}")
+            logger.error(f"Erro no polling: {e.response.status_code} - {e.response.text}")
             raise
     
     async def acknowledge_events(self, event_ids: List[str]) -> Dict[str, Any]:
@@ -328,10 +205,31 @@ class IFoodClient:
                 return {"error": "Pedido não encontrado", "order_id": order_id}
             raise
     
+    async def get_order_virtual_bag(self, order_id: str) -> Dict[str, Any]:
+        """
+        Obtém detalhes do pedido para Groceries (virtual bag)
+        Endpoint: GET /order/v1.0/orders/{id}/virtual-bag
+        """
+        client = await self._get_http_client()
+        headers = await self._get_headers()
+        
+        try:
+            response = await client.get(
+                f"{self.BASE_URL}/order/v1.0/orders/{order_id}/virtual-bag",
+                headers=headers
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return {"error": "Virtual bag não encontrada", "order_id": order_id}
+            raise
+    
     async def confirm_order(self, order_id: str) -> Dict[str, Any]:
         """
         Confirma um pedido (resposta assíncrona - 202)
         Endpoint: POST /order/v1.0/orders/{id}/confirm
+        Deadline: 8 minutos após createdAt
         """
         client = await self._get_http_client()
         headers = await self._get_headers()
@@ -343,7 +241,7 @@ class IFoodClient:
             )
             
             if response.status_code == 202:
-                return {"order_id": order_id, "status": "confirmation_pending"}
+                return {"order_id": order_id, "status": "confirmation_pending", "message": "Confirmação em processamento"}
             
             response.raise_for_status()
             return {"order_id": order_id, "status": "confirmed"}
@@ -352,7 +250,10 @@ class IFoodClient:
             raise
     
     async def start_preparation(self, order_id: str) -> Dict[str, Any]:
-        """Inicia preparo do pedido"""
+        """
+        Inicia preparo do pedido
+        Endpoint: POST /order/v1.0/orders/{id}/startPreparation
+        """
         client = await self._get_http_client()
         headers = await self._get_headers()
         
@@ -368,7 +269,10 @@ class IFoodClient:
             raise
     
     async def ready_to_pickup(self, order_id: str) -> Dict[str, Any]:
-        """Marca pedido como pronto para retirada"""
+        """
+        Marca pedido como pronto para retirada
+        Endpoint: POST /order/v1.0/orders/{id}/readyToPickup
+        """
         client = await self._get_http_client()
         headers = await self._get_headers()
         
@@ -384,7 +288,10 @@ class IFoodClient:
             raise
     
     async def dispatch_order(self, order_id: str) -> Dict[str, Any]:
-        """Despacha pedido para entrega"""
+        """
+        Despacha pedido para entrega
+        Endpoint: POST /order/v1.0/orders/{id}/dispatch
+        """
         client = await self._get_http_client()
         headers = await self._get_headers()
         
@@ -399,9 +306,31 @@ class IFoodClient:
             logger.error(f"Erro ao despachar: {e.response.status_code}")
             raise
     
+    async def get_cancellation_reasons(self, order_id: str = None) -> List[Dict[str, Any]]:
+        """
+        Obtém lista de motivos de cancelamento válidos
+        Endpoint: GET /order/v1.0/orders/{id}/cancellationReasons ou geral
+        """
+        client = await self._get_http_client()
+        headers = await self._get_headers()
+        
+        try:
+            if order_id:
+                url = f"{self.BASE_URL}/order/v1.0/orders/{order_id}/cancellationReasons"
+            else:
+                url = f"{self.BASE_URL}/order/v1.0/orders/cancellationReasons"
+            
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Erro ao buscar motivos: {e.response.status_code}")
+            raise
+    
     async def request_cancellation(self, order_id: str, cancellation_code: str) -> Dict[str, Any]:
         """
         Solicita cancelamento de pedido
+        Endpoint: POST /order/v1.0/orders/{id}/requestCancellation
         Códigos: 501 (Sistema), 502 (Duplicado), 503 (Item indisponível), etc.
         """
         client = await self._get_http_client()
@@ -424,7 +353,10 @@ class IFoodClient:
             raise
     
     async def get_order_tracking(self, order_id: str) -> Dict[str, Any]:
-        """Rastreia entrega do pedido"""
+        """
+        Rastreia entrega do pedido
+        Endpoint: GET /order/v1.0/orders/{id}/tracking
+        """
         client = await self._get_http_client()
         headers = await self._get_headers()
         
@@ -442,8 +374,30 @@ class IFoodClient:
     
     # ==================== MÓDULO 3: MERCHANT ====================
     
+    async def get_merchants(self) -> List[Dict[str, Any]]:
+        """
+        Lista todos os merchants vinculados ao app
+        Endpoint: GET /merchant/v1.0/merchants
+        """
+        client = await self._get_http_client()
+        headers = await self._get_headers()
+        
+        try:
+            response = await client.get(
+                f"{self.BASE_URL}/merchant/v1.0/merchants",
+                headers=headers
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Erro ao listar merchants: {e.response.status_code}")
+            raise
+    
     async def get_merchant_details(self, merchant_id: str = None) -> Dict[str, Any]:
-        """Obtém detalhes do estabelecimento"""
+        """
+        Obtém detalhes do estabelecimento
+        Endpoint: GET /merchant/v1.0/merchants/{id}
+        """
         client = await self._get_http_client()
         headers = await self._get_headers()
         mid = merchant_id or self.merchant_id
@@ -460,7 +414,10 @@ class IFoodClient:
             raise
     
     async def get_merchant_status(self, merchant_id: str = None) -> Dict[str, Any]:
-        """Obtém status do estabelecimento (aberto/fechado)"""
+        """
+        Obtém status do estabelecimento (aberto/fechado)
+        Endpoint: GET /merchant/v1.0/merchants/{id}/status
+        """
         client = await self._get_http_client()
         headers = await self._get_headers()
         mid = merchant_id or self.merchant_id
@@ -478,64 +435,116 @@ class IFoodClient:
     
     # ==================== MÓDULO 4: ITEM (Catálogo) ====================
     
-    async def get_items(self, merchant_id: str = None) -> List[Dict[str, Any]]:
-        """Lista itens do catálogo"""
+    async def get_catalogs(self, merchant_id: str = None) -> List[Dict[str, Any]]:
+        """
+        Lista catálogos do merchant
+        Endpoint: GET /catalog/v2.0/merchants/{merchantId}/catalogs
+        """
         client = await self._get_http_client()
         headers = await self._get_headers()
         mid = merchant_id or self.merchant_id
         
         try:
             response = await client.get(
-                f"{self.BASE_URL}/catalog/v2.0/merchants/{mid}/items",
+                f"{self.BASE_URL}/catalog/v2.0/merchants/{mid}/catalogs",
                 headers=headers
             )
             response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as e:
-            logger.error(f"Erro ao listar itens: {e.response.status_code}")
+            logger.error(f"Erro ao listar catálogos: {e.response.status_code}")
             raise
     
-    async def create_item(self, item_data: Dict[str, Any], merchant_id: str = None, reset: bool = False) -> Dict[str, Any]:
-        """Cria novo item no catálogo"""
+    async def get_products(self, merchant_id: str = None) -> List[Dict[str, Any]]:
+        """
+        Lista produtos do catálogo
+        Endpoint: GET /catalog/v2.0/merchants/{merchantId}/products
+        """
+        client = await self._get_http_client()
+        headers = await self._get_headers()
+        mid = merchant_id or self.merchant_id
+        
+        try:
+            response = await client.get(
+                f"{self.BASE_URL}/catalog/v2.0/merchants/{mid}/products",
+                headers=headers
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Erro ao listar produtos: {e.response.status_code}")
+            raise
+    
+    async def create_product(self, product_data: Dict[str, Any], merchant_id: str = None) -> Dict[str, Any]:
+        """
+        Cria novo produto no catálogo
+        Endpoint: POST /catalog/v2.0/merchants/{merchantId}/products
+        """
         client = await self._get_http_client()
         headers = await self._get_headers()
         mid = merchant_id or self.merchant_id
         
         try:
             response = await client.post(
-                f"{self.BASE_URL}/catalog/v2.0/merchants/{mid}/items",
+                f"{self.BASE_URL}/catalog/v2.0/merchants/{mid}/products",
                 headers=headers,
-                params={"reset": str(reset).lower()},
-                json=item_data
+                json=product_data
             )
             response.raise_for_status()
-            return {"success": True, "item": item_data}
+            return response.json()
         except httpx.HTTPStatusError as e:
-            logger.error(f"Erro ao criar item: {e.response.status_code}")
+            logger.error(f"Erro ao criar produto: {e.response.status_code} - {e.response.text}")
             raise
     
-    async def update_item(self, item_id: str, updates: Dict[str, Any], merchant_id: str = None) -> Dict[str, Any]:
-        """Atualiza item existente"""
+    async def update_product(self, product_id: str, product_data: Dict[str, Any], merchant_id: str = None) -> Dict[str, Any]:
+        """
+        Atualiza produto existente
+        Endpoint: PUT /catalog/v2.0/merchants/{merchantId}/products/{productId}
+        """
+        client = await self._get_http_client()
+        headers = await self._get_headers()
+        mid = merchant_id or self.merchant_id
+        
+        try:
+            response = await client.put(
+                f"{self.BASE_URL}/catalog/v2.0/merchants/{mid}/products/{product_id}",
+                headers=headers,
+                json=product_data
+            )
+            response.raise_for_status()
+            return {"success": True, "product_id": product_id}
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Erro ao atualizar produto: {e.response.status_code}")
+            raise
+    
+    async def update_product_status(self, updates: List[Dict[str, Any]], merchant_id: str = None) -> Dict[str, Any]:
+        """
+        Atualiza status de produtos em lote
+        Endpoint: PATCH /catalog/v2.0/merchants/{merchantId}/products/status
+        """
         client = await self._get_http_client()
         headers = await self._get_headers()
         mid = merchant_id or self.merchant_id
         
         try:
             response = await client.patch(
-                f"{self.BASE_URL}/catalog/v2.0/merchants/{mid}/items/{item_id}",
+                f"{self.BASE_URL}/catalog/v2.0/merchants/{mid}/products/status",
                 headers=headers,
                 json=updates
             )
             response.raise_for_status()
-            return {"success": True, "item_id": item_id, "updates": updates}
+            return {"success": True}
         except httpx.HTTPStatusError as e:
-            logger.error(f"Erro ao atualizar item: {e.response.status_code}")
+            logger.error(f"Erro ao atualizar status: {e.response.status_code}")
             raise
     
     # ==================== MÓDULO 5: PROMOTION ====================
     
     async def get_promotions(self, merchant_id: str = None) -> List[Dict[str, Any]]:
-        """Lista promoções ativas"""
+        """
+        Lista promoções ativas
+        Endpoint: GET /promotion/v1.0/merchants/{merchantId}/promotions
+        """
         client = await self._get_http_client()
         headers = await self._get_headers()
         mid = merchant_id or self.merchant_id
@@ -552,7 +561,12 @@ class IFoodClient:
             raise
     
     async def create_promotion(self, promotion_data: Dict[str, Any], merchant_id: str = None) -> Dict[str, Any]:
-        """Cria nova promoção (máximo 70% desconto)"""
+        """
+        Cria nova promoção
+        Endpoint: POST /promotion/v1.0/merchants/{merchantId}/promotions
+        Tipos: PERCENTAGE, LXPY (Buy X Get Y), PERCENTAGE_PER_X_UNITS
+        Limite: máximo 70% desconto
+        """
         client = await self._get_http_client()
         headers = await self._get_headers()
         mid = merchant_id or self.merchant_id
@@ -570,7 +584,10 @@ class IFoodClient:
             raise
     
     async def delete_promotion(self, promotion_id: str, merchant_id: str = None) -> Dict[str, Any]:
-        """Remove promoção"""
+        """
+        Remove promoção
+        Endpoint: DELETE /promotion/v1.0/merchants/{merchantId}/promotions/{promotionId}
+        """
         client = await self._get_http_client()
         headers = await self._get_headers()
         mid = merchant_id or self.merchant_id
@@ -589,13 +606,16 @@ class IFoodClient:
     # ==================== MÓDULO 6: PICKING (Separação) ====================
     
     async def start_separation(self, order_id: str) -> Dict[str, Any]:
-        """Inicia separação de pedido (para mercados)"""
+        """
+        Inicia separação de pedido (para mercados)
+        Endpoint: POST /picking/v1.0/orders/{id}/startSeparation
+        """
         client = await self._get_http_client()
         headers = await self._get_headers()
         
         try:
             response = await client.post(
-                f"{self.BASE_URL}/order/v1.0/orders/{order_id}/startSeparation",
+                f"{self.BASE_URL}/picking/v1.0/orders/{order_id}/startSeparation",
                 headers=headers
             )
             response.raise_for_status()
@@ -605,13 +625,16 @@ class IFoodClient:
             raise
     
     async def end_separation(self, order_id: str) -> Dict[str, Any]:
-        """Finaliza separação de pedido"""
+        """
+        Finaliza separação de pedido
+        Endpoint: POST /picking/v1.0/orders/{id}/endSeparation
+        """
         client = await self._get_http_client()
         headers = await self._get_headers()
         
         try:
             response = await client.post(
-                f"{self.BASE_URL}/order/v1.0/orders/{order_id}/endSeparation",
+                f"{self.BASE_URL}/picking/v1.0/orders/{order_id}/endSeparation",
                 headers=headers
             )
             response.raise_for_status()
@@ -621,13 +644,16 @@ class IFoodClient:
             raise
     
     async def add_picking_item(self, order_id: str, item_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Adiciona item durante separação"""
+        """
+        Adiciona item durante separação
+        Endpoint: POST /picking/v1.0/orders/{id}/items
+        """
         client = await self._get_http_client()
         headers = await self._get_headers()
         
         try:
             response = await client.post(
-                f"{self.BASE_URL}/order/v1.0/orders/{order_id}/picking/items",
+                f"{self.BASE_URL}/picking/v1.0/orders/{order_id}/items",
                 headers=headers,
                 json=item_data
             )
@@ -638,13 +664,16 @@ class IFoodClient:
             raise
     
     async def modify_picking_item(self, order_id: str, unique_id: str, modifications: Dict[str, Any]) -> Dict[str, Any]:
-        """Modifica item durante separação (quantidade, peso)"""
+        """
+        Modifica item durante separação (quantidade, peso)
+        Endpoint: PATCH /picking/v1.0/orders/{id}/items/{uniqueId}
+        """
         client = await self._get_http_client()
         headers = await self._get_headers()
         
         try:
-            response = await client.post(
-                f"{self.BASE_URL}/order/v1.0/orders/{order_id}/picking/items/{unique_id}",
+            response = await client.patch(
+                f"{self.BASE_URL}/picking/v1.0/orders/{order_id}/items/{unique_id}",
                 headers=headers,
                 json=modifications
             )
@@ -655,13 +684,16 @@ class IFoodClient:
             raise
     
     async def replace_picking_item(self, order_id: str, unique_id: str, replacement: Dict[str, Any]) -> Dict[str, Any]:
-        """Substitui item durante separação"""
+        """
+        Substitui item durante separação
+        Endpoint: POST /picking/v1.0/orders/{id}/items/{uniqueId}/replace
+        """
         client = await self._get_http_client()
         headers = await self._get_headers()
         
         try:
             response = await client.post(
-                f"{self.BASE_URL}/order/v1.0/orders/{order_id}/picking/items/{unique_id}/replace",
+                f"{self.BASE_URL}/picking/v1.0/orders/{order_id}/items/{unique_id}/replace",
                 headers=headers,
                 json=replacement
             )
@@ -672,19 +704,67 @@ class IFoodClient:
             raise
     
     async def remove_picking_item(self, order_id: str, unique_id: str) -> Dict[str, Any]:
-        """Remove item durante separação (ruptura de estoque)"""
+        """
+        Remove item durante separação (ruptura de estoque)
+        Endpoint: DELETE /picking/v1.0/orders/{id}/items/{uniqueId}
+        """
         client = await self._get_http_client()
         headers = await self._get_headers()
         
         try:
             response = await client.delete(
-                f"{self.BASE_URL}/order/v1.0/orders/{order_id}/picking/items/{unique_id}",
+                f"{self.BASE_URL}/picking/v1.0/orders/{order_id}/items/{unique_id}",
                 headers=headers
             )
             response.raise_for_status()
             return {"success": True, "order_id": order_id, "item_removed": unique_id}
         except httpx.HTTPStatusError as e:
             logger.error(f"Erro ao remover item: {e.response.status_code}")
+            raise
+    
+    # ==================== HANDSHAKE / NEGOCIAÇÃO ====================
+    
+    async def accept_dispute(self, dispute_id: str) -> Dict[str, Any]:
+        """
+        Aceita disputa/negociação
+        Endpoint: POST /order/v1.0/disputes/{disputeId}/accept
+        """
+        client = await self._get_http_client()
+        headers = await self._get_headers()
+        
+        try:
+            response = await client.post(
+                f"{self.BASE_URL}/order/v1.0/disputes/{dispute_id}/accept",
+                headers=headers
+            )
+            response.raise_for_status()
+            return {"dispute_id": dispute_id, "action": "accepted"}
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Erro ao aceitar disputa: {e.response.status_code}")
+            raise
+    
+    async def reject_dispute(self, dispute_id: str, reason: str = None) -> Dict[str, Any]:
+        """
+        Rejeita disputa/negociação
+        Endpoint: POST /order/v1.0/disputes/{disputeId}/reject
+        """
+        client = await self._get_http_client()
+        headers = await self._get_headers()
+        
+        body = {}
+        if reason:
+            body["reason"] = reason
+        
+        try:
+            response = await client.post(
+                f"{self.BASE_URL}/order/v1.0/disputes/{dispute_id}/reject",
+                headers=headers,
+                json=body if body else None
+            )
+            response.raise_for_status()
+            return {"dispute_id": dispute_id, "action": "rejected"}
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Erro ao rejeitar disputa: {e.response.status_code}")
             raise
 
 
