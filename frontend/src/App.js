@@ -7,6 +7,7 @@ import OrderDetail from "./pages/OrderDetail";
 import Items from "./pages/Items";
 import Promotions from "./pages/Promotions";
 import Picking from "./pages/Picking";
+import Merchant from "./pages/Merchant";
 import Settings from "./pages/Settings";
 import "./App.css";
 
@@ -31,6 +32,7 @@ function App() {
           <Route path="items" element={<Items />} />
           <Route path="promotions" element={<Promotions />} />
           <Route path="picking" element={<Picking />} />
+          <Route path="merchant" element={<Merchant />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
