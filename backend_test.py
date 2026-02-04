@@ -99,9 +99,13 @@ class IFoodDashboardTester:
         
         # Test token generation
         success, token_data = self.run_test("Get Auth Token", "GET", "/api/auth/token")
-        if success and token_data:
-            access_token = token_data.get('data', {}).get('access_token') if isinstance(token_data, dict) else None
-            print(f"   Token obtained: {bool(access_token)}")
+        if success and token_data and isinstance(token_data, dict):
+            # Check if it's a success response
+            if token_data.get('success'):
+                access_token = token_data.get('data', {}).get('access_token')
+                print(f"   Token obtained: {bool(access_token)}")
+            else:
+                print(f"   Token error: {token_data.get('error', 'Unknown error')}")
         
         return success, token_data
 
