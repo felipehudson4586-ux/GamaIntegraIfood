@@ -666,15 +666,27 @@ export default function Merchant() {
                 </CardDescription>
               </div>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={startEditingHours}
-              className="gap-1"
-            >
-              <Settings size={16} />
-              Editar
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={set24x7Hours}
+                disabled={savingHours}
+                className="gap-1 text-green-600 border-green-300 hover:bg-green-50"
+              >
+                {savingHours ? <RefreshCw size={16} className="animate-spin" /> : <Clock size={16} />}
+                24/7
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={startEditingHours}
+                className="gap-1"
+              >
+                <Settings size={16} />
+                Editar
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
