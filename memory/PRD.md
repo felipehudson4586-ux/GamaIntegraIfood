@@ -1,117 +1,300 @@
-# iFood Partner Dashboard - PRD (Product Requirements Document)
+# 📋 PRD - iFood Partner Dashboard
 
-## Problema Original
-Desenvolver um Projeto Integrador completo tendo o iFood como sistema central, focado na integração, automação e gestão inteligente de pedidos. O sistema simula um sistema profissional utilizado por estabelecimentos parceiros.
+## Visão Geral do Produto
 
-## Arquitetura do Sistema
+**Nome:** iFood Partner Dashboard  
+**Tipo:** Sistema Integrador Centralizado  
+**Versão:** 1.0.0  
+**Data:** Fevereiro 2026
+
+### Descrição
+Sistema web para gestão de pedidos de estabelecimentos parceiros do iFood. Integra com a API do iFood usando o modelo de aplicativo centralizado (client_credentials).
+
+### Objetivo
+Permitir que estabelecimentos (restaurantes, mercados, farmácias, etc.) gerenciem seus pedidos do iFood através de uma interface web moderna e intuitiva.
+
+---
+
+## Arquitetura
+
+### Tipo de Aplicativo: Centralizado
+
+**Vantagens:**
+- Autenticação simplificada (client_credentials)
+- Não precisa de refresh token
+- Uma credencial atende todos os merchants
+
+**Desvantagens:**
+- Processo manual de autorização de merchants
+- Requer cuidado com segregação de dados
 
 ### Stack Tecnológico
-- **Frontend**: React + Tailwind CSS + Shadcn/UI
-- **Backend**: FastAPI (Python)
-- **Banco de Dados**: MongoDB
-- **Integração**: iFood Merchant API via polling (30s)
 
-### Módulos Implementados (6 módulos conforme documentação iFood)
+| Camada | Tecnologia |
+|--------|------------|
+| Frontend | React 18, Tailwind CSS, shadcn/ui |
+| Backend | Python 3.11, FastAPI, Motor |
+| Database | MongoDB |
+| API Client | httpx (HTTP/2) |
 
-1. **Authentication** - OAuth token management com iFood API
-2. **Orders** - Gestão completa do ciclo de vida de pedidos
-3. **Merchant** - Dados do estabelecimento
-4. **Item** - Catálogo de produtos (CRUD)
-5. **Promotion** - Gestão de promoções (até 70% desconto)
-6. **Picking** - Separação de pedidos (para mercados)
+### Diagrama de Arquitetura
 
-## User Personas
+```
+┌────────────────────────────────────────────────────────────────┐
+│                        FRONTEND (React)                        │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐          │
+│  │Dashboard │ │ Orders   │ │ Merchant │ │ Settings │          │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘          │
+└────────────────────────────┬───────────────────────────────────┘
+                             │ HTTP (axios)
+                             ▼
+┌────────────────────────────────────────────────────────────────┐
+│                       BACKEND (FastAPI)                        │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐          │
+│  │   Auth   │ │  Orders  │ │ Merchant │ │ Polling  │          │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘          │
+│                      │                                         │
+│              ┌───────┴───────┐                                 │
+│              ▼               ▼                                 │
+│        ┌──────────┐   ┌──────────────┐                        │
+│        │ MongoDB  │   │ iFood Client │                        │
+│        └──────────┘   └──────┬───────┘                        │
+└──────────────────────────────┼─────────────────────────────────┘
+                               │ HTTPS (httpx)
+                               ▼
+                    ┌──────────────────────┐
+                    │   iFood Merchant API │
+                    │  merchant-api.ifood  │
+                    └──────────────────────┘
+```
 
-### Operador de Restaurante
-- Recebe e confirma pedidos rapidamente
-- Acompanha status de entrega
-- Gerencia catálogo de produtos
+---
 
-### Gerente de Mercado
-- Utiliza módulo de Picking para separação
-- Monitora métricas de vendas
-- Cria promoções
+## Módulos Implementados
 
-## Requisitos Funcionais Implementados ✅
+### 1. Autenticação (Authentication)
+- [x] OAuth 2.0 client_credentials
+- [x] Renovação automática de token
+- [x] Tratamento de erro 401
+- [x] Margem de segurança (5 min)
+- [x] Status de autenticação
 
-- [x] Dashboard com métricas em tempo real
-- [x] Lista de pedidos com filtros por status/tipo
-- [x] Detalhes do pedido com timeline
-- [x] Confirmação/cancelamento de pedidos
-- [x] Ciclo de vida completo (PLACED → CONFIRMED → PREPARED → DISPATCHED → CONCLUDED)
-- [x] Polling de eventos a cada 30 segundos
-- [x] Tratamento de duplicidade de eventos
-- [x] CRUD de itens do catálogo
-- [x] CRUD de promoções
-- [x] Módulo de separação (Picking)
-- [x] Status de conexão com iFood
-- [x] Tema visual padrão iFood
+### 2. Merchant (Loja)
+- [x] Listar lojas vinculadas
+- [x] Detalhes da loja
+- [x] Status da loja (OK/WARNING/CLOSED/ERROR)
+- [x] Criar/listar/remover interrupções
+- [x] Configurar horários de funcionamento
+- [x] Botão 24/7 para testes
+- [x] Gerar QR Code check-in
 
-## Requisitos Não-Funcionais
+### 3. Orders (Pedidos)
+- [x] Polling de eventos (30s)
+- [x] Acknowledgment de eventos
+- [x] Listar pedidos
+- [x] Detalhes do pedido
+- [x] Confirmar pedido
+- [x] Iniciar preparo
+- [x] Marcar pronto
+- [x] Despachar
+- [x] Cancelar
+- [x] Rastreamento
 
-- [x] Rate limiting conforme documentação (6000 RPM)
-- [x] Retry automático em erros 5XX
-- [x] Tolerância a falhas
+### 4. Item (Catálogo)
+- [x] Listar catálogos
+- [x] CRUD de produtos
+- [x] Interface de gestão
+
+### 5. Promotion (Promoções)
+- [x] Criar promoções
+- [x] Remover promoções
+- [x] Tipos: PERCENTAGE, LXPY, PERCENTAGE_PER_X_UNITS
+
+### 6. Picking (Separação)
+- [x] Iniciar/finalizar separação
+- [x] Adicionar item
+- [x] Modificar quantidade
+- [x] Substituir item
+- [x] Remover item (ruptura)
+
+### 7. Funcionalidades Extras
+- [x] Notificação sonora (Web Audio API)
+- [x] Polling automático ao iniciar
+- [x] Dashboard com métricas
 - [x] Interface responsiva
-- [x] Hot reload em desenvolvimento
 
-## O Que Foi Implementado (Jan 2026)
+---
 
-### Backend (/app/backend/)
-- `server.py` - API FastAPI com 35+ endpoints
-- `ifood_client.py` - Cliente completo para iFood API
-- `models.py` - Modelos Pydantic para todos os módulos
+## Fluxos Principais
 
-### Frontend (/app/frontend/src/)
-- Dashboard com métricas
-- Lista de pedidos com filtros
-- Detalhes do pedido com ações
-- Catálogo de itens
-- Promoções
-- Separação (Picking)
-- Configurações
+### Fluxo de Pedido
 
-### Credenciais Configuradas
-- Client ID: 0e43f047-43bd-4f9b-ae35-bea0c3aef665
-- Merchant ID: fb3625ab-1907-4e8a-af83-2e0c52733e89
+```
+1. Polling detecta novo evento (PLACED)
+2. Som de notificação toca
+3. Pedido aparece no Dashboard
+4. Operador confirma pedido (< 8 min)
+5. Inicia preparo
+6. Marca como pronto
+7. Despacha para entrega
+8. Pedido concluído
+```
 
-## Backlog Priorizado
+### Fluxo de Autenticação
 
-### P0 (Crítico)
-- ✅ Todos os 6 módulos implementados
-- ⚠️ Validar credenciais iFood em ambiente de produção
+```
+1. App inicia
+2. Verifica se há token válido
+3. Se não, solicita novo token (client_credentials)
+4. Armazena token e expiresIn
+5. Usa token nas requisições
+6. Se 401, renova token automaticamente
+```
 
-### P1 (Alta Prioridade)
+### Fluxo de Polling
+
+```
+1. App inicia → Polling automático
+2. A cada 30s: GET /events:polling
+3. Se há eventos:
+   a. Processa eventos
+   b. Salva no MongoDB
+   c. Envia ACK
+4. Se 204: Sem novos eventos
+5. Repete loop
+```
+
+---
+
+## Variáveis de Ambiente
+
+### Backend (.env)
+
+```env
+# MongoDB
+MONGO_URL="mongodb://localhost:27017"
+DB_NAME="ifood_dashboard"
+
+# CORS
+CORS_ORIGINS="*"
+
+# iFood API Credentials
+IFOOD_CLIENT_ID="seu-client-id"
+IFOOD_CLIENT_SECRET="seu-client-secret"
+IFOOD_MERCHANT_ID="seu-merchant-id"
+```
+
+### Frontend (.env)
+
+```env
+REACT_APP_BACKEND_URL="http://localhost:8001/api"
+```
+
+---
+
+## Requisitos para Homologação
+
+Conforme documentação iFood, para homologar o app é necessário:
+
+1. ✅ GET /merchants
+2. ✅ GET /merchants/{merchantId}
+3. ✅ GET /merchants/{merchantId}/status
+4. ✅ POST /merchants/{merchantId}/interruptions
+5. ✅ GET /merchants/{merchantId}/interruptions
+6. ✅ DELETE /merchants/{merchantId}/interruptions/{interruptionId}
+7. ✅ GET /merchants/{merchantId}/opening-hours
+8. ✅ PUT /merchants/{merchantId}/opening-hours
+
+---
+
+## Requisitos para Produção
+
+### Obrigatórios
+- [x] Polling a cada 30 segundos
+- [x] Confirmação de pedidos em até 8 minutos
+- [x] Tratamento de erro 401 com renovação
+- [x] ACK de eventos recebidos
+- [x] HTTPS (TLS 1.2+)
+
+### Recomendados
+- [x] Notificação sonora
+- [x] Dashboard com métricas
+- [x] Histórico de pedidos
+- [x] Filtros e busca
+
+---
+
+## Estrutura de Arquivos
+
+```
+/app
+├── backend/
+│   ├── server.py           # API FastAPI (1200+ linhas)
+│   ├── ifood_client.py     # Cliente iFood (900+ linhas)
+│   ├── models.py           # Modelos Pydantic
+│   ├── requirements.txt    # Dependências
+│   └── .env               # Configurações
+│
+├── frontend/
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── Dashboard.js    # Métricas e pedidos recentes
+│   │   │   ├── Orders.js       # Lista de pedidos
+│   │   │   ├── OrderDetail.js  # Detalhes e ações
+│   │   │   ├── Items.js        # Catálogo
+│   │   │   ├── Promotions.js   # Promoções
+│   │   │   ├── Picking.js      # Separação
+│   │   │   ├── Merchant.js     # Gestão da loja
+│   │   │   └── Settings.js     # Configurações
+│   │   ├── components/
+│   │   │   ├── Layout.js       # Layout principal
+│   │   │   └── ui/             # shadcn/ui
+│   │   ├── hooks/
+│   │   │   └── useNotificationSound.js
+│   │   └── lib/
+│   │       └── api.js          # Axios config
+│   └── package.json
+│
+├── docs/
+│   └── IFOOD_API.md        # Documentação API
+│
+├── memory/
+│   └── PRD.md              # Este documento
+│
+└── README.md               # Guia de instalação
+```
+
+---
+
+## Changelog
+
+### v1.0.0 (Fevereiro 2026)
+- Implementação inicial
+- 6 módulos iFood completos
+- Autenticação centralizada
+- Notificações sonoras
+- Interface React com Tailwind
+
+---
+
+## Próximas Features (Backlog)
+
 - [ ] Impressão de comandas
-- [ ] Notificações sonoras para novos pedidos
-- [ ] Integração com impressora térmica
-
-### P2 (Média Prioridade)
-- [ ] Relatórios avançados (gráficos por período)
-- [ ] Exportação de dados (CSV/Excel)
+- [ ] Relatórios avançados (gráficos)
+- [ ] Exportação CSV/Excel
 - [ ] Multi-merchant (várias lojas)
+- [ ] Webhook ao invés de polling
+- [ ] PWA (Progressive Web App)
+- [ ] Integração com impressoras térmicas
 
-### P3 (Baixa Prioridade)
-- [ ] Integração com outros marketplaces (Rappi, Uber Eats)
-- [ ] IA para previsão de demanda
-- [ ] App mobile (React Native)
+---
 
-## Próximos Passos
+## Contato e Suporte
 
-1. **Validar permissões do app no Portal iFood** - O erro "Grant type not authorized for client" indica que as credenciais precisam ser aprovadas/configuradas para usar authorization_code no portal: https://developer.ifood.com.br
+Para dúvidas sobre a integração iFood:
+- [Portal do Desenvolvedor](https://developer.ifood.com.br)
+- [Portal do Parceiro](https://portal.ifood.com.br)
 
-2. **Configurar app para produção** - Após aprovação, o fluxo OAuth funcionará automaticamente:
-   - Clique em "Gerar Código" na página de Configurações
-   - Acesse a URL do iFood e autorize
-   - Cole o authorizationCode de volta no sistema
+---
 
-3. **Testar com pedidos reais** - Após autorização, o polling começará a receber pedidos
-
-4. **Adicionar impressão** - Implementar template de comanda e integração com impressora
-
-## Tecnologias Sugeridas para Evolução
-
-- **IA**: OpenAI GPT para resumo de pedidos
-- **Relatórios**: Chart.js ou Recharts (já instalado)
-- **Mobile**: React Native ou PWA
-- **Filas**: Redis para processamento assíncrono
+*Documento gerado automaticamente - iFood Partner Dashboard v1.0.0*
