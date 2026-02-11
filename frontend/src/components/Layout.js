@@ -37,9 +37,23 @@ export default function Layout() {
 
   useEffect(() => {
     fetchPollingStatus();
+    // Inicia polling automaticamente ao carregar o app
+    startPollingAutomatically();
     const interval = setInterval(fetchPollingStatus, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  const startPollingAutomatically = async () => {
+    try {
+      const response = await api.get("/polling/status");
+      if (!response.data.polling_active) {
+        await api.post("/polling/start");
+        console.log("Polling iniciado automaticamente");
+      }
+    } catch (error) {
+      console.error("Erro ao iniciar polling automático:", error);
+    }
+  };
 
   const fetchPollingStatus = async () => {
     try {
