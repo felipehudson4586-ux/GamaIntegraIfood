@@ -71,3 +71,7 @@ temp/
 
 # Deployment
 .vercel
+-e 
+# Environment files
+*.env
+*.env.*
