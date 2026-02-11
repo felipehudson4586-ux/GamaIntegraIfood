@@ -283,6 +283,33 @@ export default function Merchant() {
     }
   };
 
+  // Configura horários 24/7 com um clique
+  const set24x7Hours = async () => {
+    try {
+      setSavingHours(true);
+      const allDays = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
+      const shifts = allDays.map(day => ({
+        dayOfWeek: day,
+        start: "00:00:00",
+        duration: 1439 // 23:59
+      }));
+      
+      const response = await api.put(`/merchant/opening-hours/${selectedMerchant}`, { shifts });
+      if (response.data.success) {
+        toast.success("Horários configurados para 24/7!");
+        loadOpeningHours();
+        loadMerchantStatus();
+      } else {
+        toast.error(response.data.error || "Erro ao configurar horários");
+      }
+    } catch (error) {
+      console.error("Erro ao configurar 24/7:", error);
+      toast.error("Erro ao configurar horários 24/7");
+    } finally {
+      setSavingHours(false);
+    }
+  };
+
   const addShift = () => {
     setEditingShifts([
       ...editingShifts,
